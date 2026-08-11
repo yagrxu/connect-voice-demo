@@ -1,0 +1,306 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>架构 · Connect 语音 AI</title>
+  <link rel="stylesheet" href="site.css">
+  <style>
+    .legend { display:flex; gap:1.2rem; flex-wrap:wrap; margin:.8rem 0 1.2rem; font-size:.85rem; color:var(--ink-2); }
+    .legend .k { display:inline-flex; align-items:center; gap:.4rem; }
+    .swatch { width:14px; height:14px; border-radius:4px; display:inline-block; }
+    /* data-flow steps */
+    .flow { position: relative; margin-top: 1.4rem; padding-left: 2.5rem; }
+    .flow::before { content:""; position:absolute; left: 1rem; top: .4rem; bottom: .4rem; width: 2px;
+      background: linear-gradient(var(--orange), var(--teal)); }
+    .step { position: relative; margin-bottom: 1.1rem; }
+    .step .num { position:absolute; left: -2.5rem; top: 0; width: 2rem; height: 2rem; border-radius: 50%;
+      background: var(--ink); color:#fff; display:grid; place-items:center; font-family:var(--mono);
+      font-size:.85rem; font-weight:600; box-shadow: var(--shadow); }
+    .step .body { background: var(--card); border:1px solid var(--line); border-radius: 12px; padding: .85rem 1.1rem; box-shadow: var(--shadow); }
+    .step .t { font-weight:700; }
+    .step .who { font-family:var(--mono); font-size:.72rem; letter-spacing:.08em; text-transform:uppercase; }
+    .who.you { color: var(--good); } .who.cf { color: var(--orange-deep); } .who.connect { color: var(--teal); } .who.ai { color: #6d4bd8; }
+    .step p { color: var(--ink-2); font-size:.92rem; margin-top:.25rem; }
+  </style>
+</head>
+<body>
+  <nav class="nav"><div class="nav-inner">
+    <a class="brand" href="index.html"><span class="spark">◆</span> Connect 语音 AI</a>
+    <div class="nav-links">
+      <a href="index.html">演示</a>
+      <a href="product.html">产品介绍</a>
+      <a href="architecture.html" class="active">架构</a>
+      <a href="deployment.html">部署与调优</a>
+          <a href="pricing.html">费用估算</a>
+    </div>
+  </div></nav>
+
+  <div class="wrap reveal" style="padding-top:2.5rem">
+    <div class="eyebrow">Architecture · 系统架构</div>
+    <h1 class="display">整体架构总览</h1>
+    <p class="lead" style="margin-top:.8rem">唯一公网入口是 CloudFront。静态站在 S3（OAC 保护），API 走 API Gateway。语音与 AI 全部由 Amazon Connect 托管，工具以 MCP 暴露。</p>
+
+    <div class="legend">
+      <span class="k"><span class="swatch" style="background:#eef4fb;border:1px solid #cfe0f2"></span> 浏览器 / 边缘</span>
+      <span class="k"><span class="swatch" style="background:#fff4e0;border:1px solid #f3d6a4"></span> 我们的无服务器后端</span>
+      <span class="k"><span class="swatch" style="background:var(--teal-soft);border:1px solid #b6ddda"></span> Amazon Connect 托管</span>
+      <span class="k"><span class="swatch" style="background:#efe9fb;border:1px solid #d6c8f2"></span> Q in Connect / Bedrock</span>
+    </div>
+  </div>
+
+  <!-- ============ OVERVIEW SVG ============ -->
+  <div class="wrap">
+    <div class="diagram">
+      <svg viewBox="0 0 980 470" role="img" aria-label="架构总览图">
+        <defs>
+          <marker id="arr" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto">
+            <path d="M0,0 L8,3 L0,6 Z" fill="#ec7211"/>
+          </marker>
+          <marker id="arrT" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto">
+            <path d="M0,0 L8,3 L0,6 Z" fill="#0a7d7d"/>
+          </marker>
+          <style>
+            .lbl{font-family:'IBM Plex Sans','IBM Plex Sans SC',sans-serif;font-weight:600;fill:#232f3e;}
+            .sub{font-family:'IBM Plex Mono',monospace;font-size:10px;fill:#6b7686;}
+            .grp{font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.12em;fill:#6b7686;text-transform:uppercase;}
+            .edge{stroke:#ec7211;stroke-width:2;fill:none;}
+            .edgeT{stroke:#0a7d7d;stroke-width:2;fill:none;}
+          </style>
+        </defs>
+
+        <!-- teal return arrow: Connect top -> browser top (routed high & clean) -->
+        <path class="edgeT" d="M620,150 C620,70 150,70 95,196" marker-end="url(#arrT)"/>
+        <text class="sub" x="250" y="58" fill="#0a7d7d">↩ WebRTC 语音回放（agentic voice 合成的音频）</text>
+
+        <!-- Browser -->
+        <rect x="20" y="200" width="150" height="92" rx="12" fill="#eef4fb" stroke="#cfe0f2"/>
+        <text class="grp" x="24" y="192">CLIENT</text>
+        <text class="lbl" x="36" y="238" font-size="14">🎙️ 浏览器</text>
+        <text class="sub" x="34" y="260">Chime SDK · WebRTC</text>
+        <text class="sub" x="34" y="276">Start / 字幕 / 状态</text>
+
+        <!-- CloudFront -->
+        <rect x="208" y="200" width="140" height="92" rx="12" fill="#eef4fb" stroke="#cfe0f2"/>
+        <text class="grp" x="212" y="192">EDGE</text>
+        <text class="lbl" x="222" y="238" font-size="14">CloudFront</text>
+        <text class="sub" x="222" y="260">唯一公网入口</text>
+        <text class="sub" x="222" y="276">OAC 签名</text>
+
+        <!-- S3 -->
+        <rect x="386" y="120" width="160" height="70" rx="12" fill="#fff4e0" stroke="#f3d6a4"/>
+        <text class="grp" x="390" y="112">BACKEND · 无服务器</text>
+        <text class="lbl" x="400" y="150" font-size="13">S3 静态站</text>
+        <text class="sub" x="400" y="170">index / app.js / 页面</text>
+
+        <!-- API GW + webcall lambda -->
+        <rect x="386" y="212" width="160" height="80" rx="12" fill="#fff4e0" stroke="#f3d6a4"/>
+        <text class="lbl" x="400" y="240" font-size="13">API Gateway</text>
+        <text class="sub" x="400" y="260">/webcall · /transcript</text>
+        <text class="sub" x="400" y="276">→ webcall Lambda</text>
+
+        <!-- Connect instance (wider to avoid text overflow) -->
+        <rect x="584" y="112" width="196" height="168" rx="12" fill="#e2f1f0" stroke="#b6ddda"/>
+        <text class="grp" x="588" y="104">AMAZON CONNECT · 托管</text>
+        <text class="lbl" x="600" y="138" font-size="13">Connect 实例</text>
+        <text class="sub" x="600" y="158">StartWebRTCContact</text>
+        <text class="sub" x="600" y="174">Contact Flow</text>
+        <text class="sub" x="600" y="190">Set voice：agentic voice</text>
+        <text class="sub" x="600" y="206">Get customer input</text>
+        <text class="sub" x="600" y="228">Lex V2 bot</text>
+        <text class="sub" x="600" y="244">＋ QInConnectIntent（转发）</text>
+
+        <!-- AI agent -->
+        <rect x="584" y="312" width="196" height="92" rx="12" fill="#efe9fb" stroke="#d6c8f2"/>
+        <text class="grp" x="588" y="304">Q IN CONNECT · Bedrock</text>
+        <text class="lbl" x="600" y="338" font-size="13">Orchestrator AI agent</text>
+        <text class="sub" x="600" y="360">Claude · 多步推理</text>
+        <text class="sub" x="600" y="376">AIPrompt + Guardrail</text>
+
+        <!-- Gateway MCP -->
+        <rect x="820" y="312" width="150" height="92" rx="12" fill="#efe9fb" stroke="#d6c8f2"/>
+        <text class="lbl" x="834" y="340" font-size="13">AgentCore</text>
+        <text class="lbl" x="834" y="358" font-size="13">Gateway (MCP)</text>
+        <text class="sub" x="834" y="378">CUSTOM_JWT 授权</text>
+        <text class="sub" x="834" y="392">工具发现 / 路由</text>
+
+        <!-- Tool lambda -->
+        <rect x="820" y="200" width="150" height="80" rx="12" fill="#fff4e0" stroke="#f3d6a4"/>
+        <text class="lbl" x="834" y="230" font-size="13">工具 Lambda</text>
+        <text class="sub" x="834" y="250">get_current_time</text>
+        <text class="sub" x="834" y="266">get_weather</text>
+
+        <!-- edges (orange = control/http) -->
+        <path class="edge" d="M170,246 L204,246" marker-end="url(#arr)"/>
+        <path class="edge" d="M348,238 L382,160" marker-end="url(#arr)"/>
+        <path class="edge" d="M348,250 L382,250" marker-end="url(#arr)"/>
+        <path class="edge" d="M546,250 L580,215" marker-end="url(#arr)"/>
+        <!-- teal = voice/tool path -->
+        <path class="edgeT" d="M682,280 L682,308" marker-end="url(#arrT)"/>
+        <path class="edgeT" d="M780,358 L816,358" marker-end="url(#arrT)"/>
+        <path class="edgeT" d="M895,312 L895,284" marker-end="url(#arrT)"/>
+      </svg>
+    </div>
+    <p class="muted" style="font-size:.85rem;margin-top:.6rem">
+      橙色箭头＝控制/HTTP 路径；青色箭头＝语音与工具调用路径。浏览器媒体流经 WebRTC 与 Connect 双向流动。
+    </p>
+  </div>
+
+  <!-- ============ VOICE DATA-FORMAT PIPELINE ============ -->
+  <section class="wrap">
+    <div class="eyebrow">Voice Pipeline · 语音数据形态流转</div>
+    <h2 class="display">音频 ↔ 文字：谁做 ASR、谁做 TTS</h2>
+    <p class="lead" style="margin-top:.6rem">
+      关键澄清：<strong>ASR 和 TTS 都由 “Amazon Connect agentic voice” 这一个 provider 完成</strong>（同一个提供方，两个环节）。<strong>Lex V2 不是 ASR 引擎</strong>——它是对话/编排层（NLU），负责管理回合、把识别出的文字交给 <code>QInConnect</code> intent，并通过 <code>x-amz-lex</code> 会话属性控制 ASR 行为（结束回合判定、barge-in）。下图按数据形态把链路拆开：<span style="color:var(--teal);font-weight:600">青色＝音频流</span>，<span style="color:var(--orange-deep);font-weight:600">橙色＝文字</span>。
+    </p>
+
+    <div class="diagram" style="margin-top:1rem">
+      <svg viewBox="0 0 960 380" role="img" aria-label="语音数据形态流转图">
+        <defs>
+          <marker id="aud" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#0a7d7d"/></marker>
+          <marker id="txt" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#ec7211"/></marker>
+          <style>
+            .n{fill:#fff;stroke:#b6ddda;} .np{fill:#efe9fb;stroke:#d6c8f2;}
+            .nl{font-family:'IBM Plex Sans','IBM Plex Sans SC',sans-serif;font-weight:600;font-size:13px;fill:#232f3e;}
+            .ns{font-family:'IBM Plex Mono',monospace;font-size:9.5px;fill:#6b7686;}
+            .audio{stroke:#0a7d7d;stroke-width:3;fill:none;}
+            .text{stroke:#ec7211;stroke-width:3;fill:none;}
+            .fmt{font-family:'IBM Plex Mono',monospace;font-size:9.5px;font-weight:500;}
+            .rowlbl{font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.1em;fill:#6b7686;text-transform:uppercase;}
+          </style>
+        </defs>
+
+          <!-- ===== Row 1: UPSTREAM (understand) ===== -->
+          <text class="rowlbl" x="20" y="34">① 上行 · 听懂你（音频 → 文字）</text>
+
+          <!-- mic -->
+          <rect class="n" x="20"  y="48" width="120" height="66" rx="11"/>
+          <text class="nl" x="34" y="78">🎙️ 浏览器麦克风</text>
+          <text class="ns" x="34" y="98">Chime SDK 采集</text>
+          <!-- connect media -->
+          <rect class="n" x="270" y="48" width="150" height="66" rx="11"/>
+          <text class="nl" x="284" y="76">Connect 媒体侧</text>
+          <text class="ns" x="284" y="94">接收 WebRTC 媒体</text>
+          <text class="ns" x="284" y="107">交给 ASR</text>
+          <!-- ASR -->
+          <rect class="n" x="530" y="42" width="180" height="78" rx="11" stroke="#0a7d7d"/>
+          <text class="nl" x="544" y="68">agentic voice · ASR</text>
+          <text class="ns" x="544" y="86">Advanced 流式识别</text>
+          <text class="ns" x="544" y="100">语音 → 文字 + 回合判定</text>
+          <text class="ns" x="544" y="113">（bot 的 Speech-to-Text 配置）</text>
+          <!-- Lex = entry adapter / forwarder (NOT ASR, NOT the brain) -->
+          <rect class="n" x="790" y="42" width="160" height="78" rx="11" stroke="#c9b8ec"/>
+          <text class="nl" x="804" y="64">Lex V2 bot</text>
+          <text class="ns" x="804" y="82">接入门户（Connect 必需）</text>
+          <text class="ns" x="804" y="96">QInConnect：整句转发</text>
+          <text class="ns" x="804" y="110">非 ASR · 非大脑</text>
+
+          <!-- row1 edges -->
+          <path class="audio" d="M140,81 L266,81" marker-end="url(#aud)"/>
+          <text class="fmt" x="150" y="72" fill="#0a7d7d">Opus / WebRTC 音频流</text>
+          <path class="audio" d="M420,81 L526,81" marker-end="url(#aud)"/>
+          <text class="fmt" x="424" y="72" fill="#0a7d7d">8/16kHz PCM</text>
+          <path class="text" d="M710,81 L796,81" marker-end="url(#txt)"/>
+          <text class="fmt" x="708" y="72" fill="#ec7211">文字</text>
+
+          <!-- ===== Row 2: DOWNSTREAM (respond) ===== -->
+          <text class="rowlbl" x="20" y="214">② 下行 · 回答你（文字 → 音频）</text>
+
+          <!-- AI agent -->
+          <rect class="np" x="20" y="228" width="180" height="86" rx="11"/>
+          <text class="nl" x="34" y="254">AI agent · Orchestrator</text>
+          <text class="ns" x="34" y="272">Claude 多步推理</text>
+          <text class="ns" x="34" y="286">经 MCP 调 get_weather</text>
+          <text class="ns" x="34" y="300">产出 &lt;message&gt; 文字</text>
+          <!-- TTS -->
+          <rect class="n" x="330" y="234" width="180" height="74" rx="11" stroke="#0a7d7d"/>
+          <text class="nl" x="344" y="262">agentic voice · TTS</text>
+          <text class="ns" x="344" y="280">Matthew 语音合成</text>
+          <text class="ns" x="344" y="294">（Set voice 配置）</text>
+          <!-- connect media out -->
+          <rect class="n" x="620" y="240" width="150" height="62" rx="11"/>
+          <text class="nl" x="634" y="266">Connect 媒体侧</text>
+          <text class="ns" x="634" y="285">WebRTC 回放</text>
+          <!-- speaker -->
+          <rect class="n" x="850" y="240" width="90" height="62" rx="11"/>
+          <text class="nl" x="864" y="266">🔊 扬声器</text>
+          <text class="ns" x="864" y="285">浏览器</text>
+
+          <!-- row2 edges -->
+          <path class="text" d="M200,271 L326,271" marker-end="url(#txt)"/>
+          <text class="fmt" x="206" y="262" fill="#ec7211">文字 &lt;message&gt;</text>
+          <path class="audio" d="M510,271 L616,271" marker-end="url(#aud)"/>
+          <text class="fmt" x="512" y="262" fill="#0a7d7d">合成音频</text>
+          <path class="audio" d="M770,271 L846,271" marker-end="url(#aud)"/>
+          <text class="fmt" x="760" y="262" fill="#0a7d7d">Opus/WebRTC</text>
+        </svg>
+    </div>
+    <p class="muted" style="font-size:.85rem;margin-top:.6rem">
+      一句话记法：<strong>耳朵和嘴</strong>（ASR / TTS）＝ agentic voice；<strong>思考与选工具</strong>＝ orchestrator AI agent；<strong>Lex V2 只是接线盒</strong>——Connect 的语音入口只能接一个 Lex bot，它用 <code>QInConnect</code> intent 把整句原样转发给 AI agent，并承载 ASR 的会话控制参数（<code>x-amz-lex</code>），自身不做 ASR、不做对话逻辑。音频只在浏览器 ↔ Connect 之间以 WebRTC 流动，进入 Connect 后立刻转成文字，AI 全程处理文字。
+    </p>
+  </section>
+
+  <!-- ============ SCENARIO DATA FLOW ============ -->
+  <section class="wrap">
+    <div class="eyebrow">Scenario Data Flow · 场景数据流（核心）</div>
+    <h2 class="display">一次语音提问，数据怎么走</h2>
+    <p class="lead" style="margin-top:.6rem">以“西雅图天气怎么样？”为例，从点击开始到听见回答的完整链路。</p>
+
+    <div class="flow">
+      <div class="step"><div class="num">1</div><div class="body">
+        <span class="who you">浏览器</span> · <span class="t">点击「开始通话」</span>
+        <p>网页向 <code>/webcall</code> 发请求；后端 Lambda 调用 <code>StartWebRTCContact</code>，返回 Chime 会议/参会者信息。浏览器用 Amazon Chime SDK 建立 WebRTC 语音流。UI 显示「⏳ 连接中」。</p>
+      </div></div>
+      <div class="step"><div class="num">2</div><div class="body">
+        <span class="who connect">Connect · Contact Flow</span> · <span class="t">建立会话并问候</span>
+        <p>Contact 进入 Flow：Set logging → Set voice（agentic voice, Matthew）→ <code>CreateWisdomSession</code> 建立 Q in Connect 会话 → Get customer input 交给 Lex bot，并把 session-arn 作为 Lex 会话属性传入。Matthew 播报开场白，UI 切到「🎙️ 正在听」。</p>
+      </div></div>
+      <div class="step"><div class="num">3</div><div class="body">
+        <span class="who you">你</span> · <span class="t">说出问题</span>
+        <p>“What's the weather in Seattle?” — agentic voice 的流式 ASR 识别语音；用户停顿时结束回合。UI 切到「💭 思考中」。</p>
+      </div></div>
+      <div class="step"><div class="num">4</div><div class="body">
+        <span class="who ai">AI agent · Orchestrator</span> · <span class="t">推理 + 选择工具</span>
+        <p>Lex 的 <code>AMAZON.QInConnectIntent</code> 把话交给 orchestrator AI agent。Claude 依据 orchestration prompt 判断需要天气数据，决定调用 <code>get_weather</code> 工具。</p>
+      </div></div>
+      <div class="step"><div class="num">5</div><div class="body">
+        <span class="who ai">MCP · AgentCore Gateway</span> · <span class="t">工具调用</span>
+        <p>AI agent 经 AgentCore Gateway（CUSTOM_JWT 授权，audience = Gateway ID）以 MCP 协议调用工具；Gateway 路由到我们的工具 Lambda 执行 <code>get_weather("Seattle")</code>，返回确定性结果。</p>
+      </div></div>
+      <div class="step"><div class="num">6</div><div class="body">
+        <span class="who ai">AI agent</span> · <span class="t">生成回答</span>
+        <p>拿到工具结果后，Claude 生成一句自然语言回复，用 <code>&lt;message&gt;</code> 包裹（orchestrator 要求）。</p>
+      </div></div>
+      <div class="step"><div class="num">7</div><div class="body">
+        <span class="who connect">Connect · agentic voice</span> · <span class="t">合成并回放</span>
+        <p>回复文本经 agentic voice 合成为语音，通过 WebRTC 播回浏览器。UI 切到「🔊 正在回答」。</p>
+      </div></div>
+      <div class="step"><div class="num">8</div><div class="body">
+        <span class="who cf">字幕 · 异步</span> · <span class="t">从日志补齐双方文本</span>
+        <p>Connect 把 <code>TRANSCRIPT_ORCHESTRATION_MESSAGE</code>（含 CUSTOMER / BOT 文本）投递到 CloudWatch；网页每 1.5 秒轮询 <code>/transcript</code>（<code>FilterLogEvents</code>，非索引查询）把双方对话渲染成字幕，便于对比识别与回答。</p>
+      </div></div>
+    </div>
+  </section>
+
+  <!-- ============ RESPONSIBILITY TABLE ============ -->
+  <section class="wrap">
+    <div class="eyebrow">Ownership · 我们写什么 vs Connect 托管什么</div>
+    <table class="tbl">
+      <tr><th style="width:26%">组件</th><th style="width:34%">谁负责</th><th>实现</th></tr>
+      <tr><td>ASR / TTS（agentic voice）</td><td>Amazon Connect 托管</td><td>Contact Flow 的 Set voice 块</td></tr>
+      <tr><td>大脑（推理 + 选工具）</td><td>Connect orchestrator AI agent</td><td>Wisdom AIAgent + AIPrompt（Claude）</td></tr>
+      <tr><td>工具执行逻辑</td><td>我们的 Lambda</td><td><code>lambda/tools/</code>（Python，确定性）</td></tr>
+      <tr><td>工具暴露为 MCP</td><td>AgentCore Gateway</td><td><code>AWS::BedrockAgentCore::Gateway</code></td></tr>
+      <tr><td>浏览器语音接入</td><td>Connect web calling + Chime SDK</td><td><code>lambda/webcall/</code> + <code>web/</code></td></tr>
+      <tr><td>公网入口（合规）</td><td>CloudFront → S3(OAC) + API Gateway</td><td>不暴露任何 Lambda Function URL</td></tr>
+      <tr><td>对话字幕</td><td>AI agent 日志 → 前端轮询</td><td>EVENT_LOGS + <code>/transcript</code></td></tr>
+    </table>
+    <div style="margin-top:1.6rem; display:flex; gap:.8rem; flex-wrap:wrap">
+      <a class="btn btn-primary" href="index.html">▶ 打开实时演示</a>
+      <a class="btn btn-ghost" href="deployment.html">看部署流程与调优细节</a>
+    </div>
+  </section>
+
+  <div class="footer"><div class="wrap">Amazon Connect 语音 AI 演示 · 沙箱环境 · 仅供方案演示</div></div>
+</body>
+</html>

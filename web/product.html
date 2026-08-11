@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>产品介绍 · Connect 语音 AI</title>
+  <link rel="stylesheet" href="site.css">
+  <style>
+    .hero { padding: 3.5rem 0 1rem; }
+    .kpis { display: grid; grid-template-columns: repeat(3,1fr); gap: 1rem; margin-top: 2rem; }
+    @media (max-width: 860px){ .kpis { grid-template-columns: 1fr; } }
+    .kpi { background: var(--card); border:1px solid var(--line); border-radius: var(--radius); padding: 1.2rem 1.3rem; box-shadow: var(--shadow); }
+    .kpi .n { font-family: var(--display); font-size: 2rem; color: var(--orange-deep); font-weight: 700; letter-spacing:-.02em; }
+    .kpi .l { font-size: .9rem; color: var(--ink-2); margin-top: .2rem; }
+    .flow-strip { display:flex; align-items:center; gap:.6rem; flex-wrap:wrap; margin: 1.4rem 0 0; }
+    .flow-strip .node { background:var(--card); border:1px solid var(--line); border-radius:10px; padding:.5rem .8rem; font-size:.85rem; font-weight:600; box-shadow: var(--shadow); }
+    .flow-strip .arrow { color: var(--orange-deep); font-weight:700; }
+  </style>
+</head>
+<body>
+  <nav class="nav"><div class="nav-inner">
+    <a class="brand" href="index.html"><span class="spark">◆</span> Connect 语音 AI</a>
+    <div class="nav-links">
+      <a href="index.html">演示</a>
+      <a href="product.html" class="active">产品介绍</a>
+      <a href="architecture.html">架构</a>
+      <a href="deployment.html">部署与调优</a>
+          <a href="pricing.html">费用估算</a>
+    </div>
+  </div></nav>
+
+  <div class="wrap hero reveal">
+    <div class="eyebrow">Product · 方案概述</div>
+    <h1 class="display">把语音 AI 助手，<br>建在 Amazon Connect 之上。</h1>
+    <p class="lead" style="margin-top:1rem">
+      语音 AI 助手常见做法是用一个 <strong>voice-to-voice 模型</strong>（如 Amazon Nova 2 Sonic）端到端处理语音进、语音出。本方案改用 <strong>Amazon Connect</strong> 的原生 agentic 能力做出同等语音体验：浏览器直接说话，Connect 负责语音识别与合成、AI agent 负责推理与工具调用——以组件化、可托管、可编排的方式实现，而非依赖单一 voice-to-voice 模型。
+    </p>
+    <div class="flow-strip">
+      <span class="node">🎙️ 浏览器语音</span><span class="arrow">→</span>
+      <span class="node">Connect agentic voice</span><span class="arrow">→</span>
+      <span class="node">Orchestrator AI agent</span><span class="arrow">→</span>
+      <span class="node">MCP 工具</span><span class="arrow">→</span>
+      <span class="node">🔊 语音回答</span>
+    </div>
+    <div style="margin-top:1.8rem; display:flex; gap:.8rem; flex-wrap:wrap">
+      <a class="btn btn-primary" href="index.html">▶ 打开实时演示</a>
+      <a class="btn btn-ghost" href="architecture.html">看架构与数据流</a>
+    </div>
+
+    <div class="kpis">
+      <div class="kpi"><div class="n">0</div><div class="l">电话号码——纯浏览器 WebRTC 接入</div></div>
+      <div class="kpi"><div class="n">≈95%</div><div class="l">链路 CDK 一键部署，其余用 SDK 补齐</div></div>
+      <div class="kpi"><div class="n">2</div><div class="l">演示工具：报时间、报天气（确定性、可离线）</div></div>
+    </div>
+  </div>
+
+  <section class="wrap">
+    <div class="eyebrow">Capabilities · 核心能力</div>
+    <h2 class="display">五块拼在一起，就是一个语音 AI</h2>
+    <div class="grid grid-3" style="margin-top:1.4rem">
+      <div class="card"><div class="ic">🎙️</div><h3>浏览器语音入口</h3><p class="muted">通过 Connect web calling（WebRTC）+ Amazon Chime SDK，网页点一下即可通话，无需电话号码、无需安装客户端。</p></div>
+      <div class="card"><div class="ic">🗣️</div><h3>Agentic voice</h3><p class="muted">Connect 托管的富表现力 ASR + TTS，支持自然停顿、打断（barge-in）。采用组件化语音，而非单一 voice-to-voice 模型（如 Nova 2 Sonic）的 speech-to-speech。</p></div>
+      <div class="card"><div class="ic">🧠</div><h3>托管的“大脑”</h3><p class="muted">Connect orchestrator AI agent 负责多步推理，自行判断该调哪个工具——无需自建 Bedrock 调用循环。</p></div>
+      <div class="card"><div class="ic">🔧</div><h3>MCP 工具</h3><p class="muted">工具逻辑在我们的 Lambda 里，通过 AgentCore Gateway 以 Model Context Protocol 暴露给 AI agent。</p></div>
+      <div class="card"><div class="ic">📝</div><h3>可对比的字幕</h3><p class="muted">对话双方文本都从 Connect 的 AI agent 日志实时拉取，让你直接对比“听到的”与“回答的”。</p></div>
+      <div class="card accent"><div class="ic">📦</div><h3>基础设施即代码</h3><p class="muted">工具、Gateway、MCP 注册、JWT 授权、Lex bot、Contact Flow、AI agent 全链路由 CDK 部署；少数 CFN 未覆盖处用 SDK 补齐。</p></div>
+    </div>
+  </section>
+
+  <section class="wrap">
+    <div class="eyebrow">Comparison · 两类语音 AI 方案对比</div>
+    <h2 class="display">Voice-to-voice 模型 vs Connect 组件化</h2>
+    <p class="lead" style="margin-top:.4rem; font-size:1rem">同样是“语音进、语音出 + 会调工具的 AI 助手”，两条实现路线的取舍。</p>
+    <table class="tbl" style="margin-top:1.2rem">
+      <tr><th style="width:16%">维度</th><th>Voice-to-voice 模型方案（如 Amazon Nova 2 Sonic）</th><th>本方案（Amazon Connect 组件化）</th></tr>
+      <tr><td>语音引擎</td><td>单一模型端到端 speech-to-speech</td><td>Connect <strong>agentic voice</strong> 的 ASR + TTS（可托管、50+ 语言/嗓音）</td></tr>
+      <tr><td>“大脑”</td><td>模型内置对话与工具调用</td><td>Connect <strong>orchestrator AI agent</strong>（托管，多步推理、可编排）</td></tr>
+      <tr><td>工具</td><td>随模型的函数调用约定</td><td><strong>MCP</strong>：AgentCore Gateway → Lambda（标准协议、可复用）</td></tr>
+      <tr><td>浏览器接入</td><td>自建 WebSocket + 模型双向流</td><td>Connect <strong>web calling</strong>（WebRTC）+ Chime SDK（开箱即用）</td></tr>
+      <tr><td>运维与治理</td><td>自行承载模型会话与扩缩</td><td>Connect 托管：安全档案、日志、观测、合规入口</td></tr>
+    </table>
+    <p class="muted" style="margin-top:1rem; font-size:.9rem">
+      取舍诚实说明：voice-to-voice 模型是真正的端到端语音（自然停顿、极低延迟）；Connect + agentic voice 是回合制（说完 → 识别 → 推理 → 合成），但支持打断（barge-in），并把语音、推理、工具、合规入口都变成可托管、可编排的标准组件。演示工具（get_current_time / get_weather）为确定性实现、无外部依赖。
+    </p>
+  </section>
+
+  <section class="wrap">
+    <div class="eyebrow">Contact Flow · 呼叫编排脚本</div>
+    <h2 class="display">Flow：把语音、会话与 AI 串起来的编排</h2>
+    <p class="lead" style="margin-top:.6rem">
+      <strong>Contact Flow</strong> 是 Amazon Connect 的可视化编排（本质是一个状态机）——每一通接入的联系（这里是浏览器 web call）都会“走”一遍这个 flow，按块（block）顺序被处理。它决定了：用什么嗓音、什么时候建立 AI 会话、把话交给谁、以及出错/结束怎么走。我们这个 demo 的 flow 只有 5 个块，却把整条语音 AI 链路串了起来。
+    </p>
+
+    <!-- flow strip -->
+    <div style="display:flex; align-items:center; gap:.4rem; flex-wrap:wrap; margin:1.4rem 0 1.8rem">
+      <span class="fblock">1 · 开启日志</span><span class="farrow">→</span>
+      <span class="fblock">2 · 设置嗓音</span><span class="farrow">→</span>
+      <span class="fblock">3 · 建 AI 会话</span><span class="farrow">→</span>
+      <span class="fblock hi">4 · 获取客户输入（Lex bot）</span><span class="farrow">→</span>
+      <span class="fblock">5 · 挂断</span>
+    </div>
+
+    <div class="grid grid-2">
+      <div class="card"><div style="display:flex;justify-content:space-between;align-items:baseline"><h3>1 · 开启流日志</h3><span class="pill">UpdateFlowLoggingBehavior</span></div>
+        <p class="muted" style="margin-top:.5rem">打开这通联系的流日志。后续排障、以及网页字幕所依赖的对话记录，都从这里开始产生。</p></div>
+
+      <div class="card"><div style="display:flex;justify-content:space-between;align-items:baseline"><h3>2 · 设置嗓音</h3><span class="pill">UpdateContactTextToSpeechVoice</span></div>
+        <p class="muted" style="margin-top:.5rem">把本通对话的 TTS 嗓音设为 <code>Matthew</code>（Amazon Connect agentic voice）。之后所有语音合成——包括开场白与 AI 回答——都用这把嗓音，保证声音一致。</p></div>
+
+      <div class="card accent"><div style="display:flex;justify-content:space-between;align-items:baseline"><h3>3 · 建立 AI 会话</h3><span class="pill">CreateWisdomSession</span></div>
+        <p class="muted" style="margin-top:.5rem">创建一个 Q in Connect 会话并绑定 orchestrator AI agent，得到一个 <code>SessionArn</code>。<strong>这是关键一步</strong>：没有它，下一步的 AI 意图会因为“没有活动会话”而失败。</p></div>
+
+      <div class="card accent"><div style="display:flex;justify-content:space-between;align-items:baseline"><h3>4 · 获取客户输入</h3><span class="pill">ConnectParticipantWithLexBot</span></div>
+        <p class="muted" style="margin-top:.5rem">核心块。先播开场白“Hi! How can I help you today?”，再把语音交给 Lex bot。两个要点：<br>
+        · 通过 <code>LexSessionAttributes</code> 把第 3 步的 <code>SessionArn</code> 作为 <code>x-amz-lex:q-in-connect:session-arn</code> 传入，AI 会话才接得上；<br>
+        · Lex 的 <code>QInConnectIntent</code> 把整句转发给 AI agent——真正的语音识别（agentic voice ASR）、推理与工具调用都在这一步内部完成，最后合成语音回放。</p></div>
+
+      <div class="card"><div style="display:flex;justify-content:space-between;align-items:baseline"><h3>5 · 挂断</h3><span class="pill">DisconnectParticipant</span></div>
+        <p class="muted" style="margin-top:.5rem">对话结束（或 AI 选择 <code>Complete</code> / <code>Escalate</code> 返回控制）后，结束这通联系。生产中可在此接入“转人工队列”等分支。</p></div>
+
+      <div class="card"><div class="ic">🧩</div><h3>为什么用 Flow 来编排</h3>
+        <p class="muted" style="margin-top:.2rem">Flow 让“语音 + 会话 + AI + 出错处理”变成一段可视化、可版本化、可发布的脚本，而不是散落在代码里的胶水逻辑。整个 flow 由 CDK 以 <code>AWS::Connect::ContactFlow</code> 部署并直接发布（State=ACTIVE）。</p></div>
+    </div>
+
+    <p class="muted" style="margin-top:1rem; font-size:.88rem">
+      想看这 5 个块在一次真实对话里逐帧怎么走、数据形态如何转换，见 <a href="architecture.html">架构页的场景数据流</a>。
+    </p>
+
+    <div style="margin-top:1.6rem; display:flex; gap:.8rem; flex-wrap:wrap">
+      <a class="btn btn-primary" href="index.html">▶ 打开实时演示</a>
+      <a class="btn btn-ghost" href="architecture.html">看架构与数据流</a>
+    </div>
+  </section>
+
+  <div class="footer"><div class="wrap">Amazon Connect 语音 AI 演示 · 沙箱环境 · 仅供方案演示</div></div>
+
+  <style>
+    .fblock { background:var(--card); border:1px solid var(--line); border-radius:9px; padding:.5rem .8rem;
+      font-weight:600; font-size:.9rem; box-shadow:var(--shadow); white-space:nowrap; }
+    .fblock.hi { border-color:var(--orange); box-shadow:0 0 0 2px rgba(255,153,0,.18), var(--shadow); }
+    .farrow { color:var(--orange-deep); font-weight:700; }
+  </style>
+</body>
+</html>

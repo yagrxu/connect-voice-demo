@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>部署与调优 · Connect 语音 AI</title>
+  <link rel="stylesheet" href="site.css">
+  <style>
+    .steps { counter-reset: s; display:flex; flex-direction:column; gap:.7rem; margin-top:1.2rem; }
+    .dstep { display:flex; gap:.9rem; align-items:flex-start; background:var(--card); border:1px solid var(--line);
+      border-radius:12px; padding:.9rem 1.1rem; box-shadow:var(--shadow); }
+    .dstep .n { counter-increment:s; }
+    .dstep .n::before { content: counter(s); display:grid; place-items:center; width:1.9rem; height:1.9rem;
+      background:var(--orange); color:#1a1a1a; font-family:var(--mono); font-weight:600; border-radius:8px; }
+    .dstep .c code { display:inline-block; margin-top:.3rem; }
+    .lane-h { font-weight:700; margin: 1.6rem 0 .5rem; display:flex; align-items:center; gap:.5rem; }
+    ul.clean { list-style:none; display:flex; flex-direction:column; gap:.5rem; }
+    ul.clean li { display:flex; gap:.6rem; align-items:flex-start; font-size:.93rem; }
+    ul.clean li::before { content:"›"; color:var(--orange-deep); font-weight:700; }
+    .tune { border-left: 3px solid var(--teal); }
+    .tune h3 { color: var(--ink); }
+    .tune .why { font-size:.86rem; color:var(--muted); margin-top:.35rem; }
+  </style>
+</head>
+<body>
+  <nav class="nav"><div class="nav-inner">
+    <a class="brand" href="index.html"><span class="spark">◆</span> Connect 语音 AI</a>
+    <div class="nav-links">
+      <a href="index.html">演示</a>
+      <a href="product.html">产品介绍</a>
+      <a href="architecture.html">架构</a>
+      <a href="deployment.html" class="active">部署与调优</a>
+          <a href="pricing.html">费用估算</a>
+    </div>
+  </div></nav>
+
+  <div class="wrap reveal" style="padding-top:2.5rem">
+    <div class="eyebrow">Deployment · 部署流程</div>
+    <h1 class="display">一键部署为主，<br>少数 SDK 补齐。</h1>
+    <p class="lead" style="margin-top:.8rem">
+      绝大部分基础设施由 CDK 一次部署完成。少数资源因为 CloudFormation 尚未覆盖（多为 preview 能力），改用 SDK / <code>AwsCustomResource</code> 或控制台一次性配置。下面如实列出边界——这也是迁移时最容易踩坑的地方。
+    </p>
+  </div>
+
+  <section class="wrap section-tight">
+    <div class="eyebrow">Flow · 部署步骤</div>
+    <div class="steps">
+      <div class="dstep"><div class="n"></div><div class="c">
+        <strong>前置</strong>：目标账号/区域启用 <strong>Connect Customer</strong>（下一代实例，agentic voice / AI agent designer 的前提，仅控制台）；Bedrock 控制台开通所需模型访问。
+      </div></div>
+      <div class="dstep"><div class="n"></div><div class="c">
+        <strong>首次部署（Gateway = NONE）</strong>：<code>npm run deploy -- -c enableAiAgent=true</code>。建好工具/Gateway/MCP 注册/Lex/Flow/AI agent 全链路，输出 Gateway ID。
+      </div></div>
+      <div class="dstep"><div class="n"></div><div class="c">
+        <strong>切 JWT（第二轮）</strong>：<code>-c jwtDiscoveryUrl=…/.well-known/openid-configuration -c jwtAudience=&lt;gateway id&gt;</code>。Gateway 的 AuthorizerType 不可原地改，CDK 会整套替换为 CUSTOM_JWT。
+      </div></div>
+      <div class="dstep"><div class="n"></div><div class="c">
+        <strong>SDK / 控制台补齐</strong>：AI agent ↔ security profile 关联、设为默认 self-service、工具挂载（见下表）。多数已封装进 <code>AwsCustomResource</code> 随 CDK 执行。
+      </div></div>
+    </div>
+  </section>
+
+  <section class="wrap">
+    <div class="eyebrow">Boundary · CDK 支持 vs 需要 SDK</div>
+    <h2 class="display">哪些能一键，哪些要手动补</h2>
+
+    <div class="lane-h"><span class="pill cdk">CDK 自动</span> 一次 <code>cdk deploy</code> 完成、已实机验证</div>
+    <table class="tbl">
+      <tr><th style="width:42%">资源 / 能力</th><th>CloudFormation 类型</th></tr>
+      <tr><td>工具 Lambda（时间/天气）</td><td><code>AWS::Lambda::Function</code></td></tr>
+      <tr><td>AgentCore Gateway + Target（MCP）</td><td><code>AWS::BedrockAgentCore::Gateway / GatewayTarget</code></td></tr>
+      <tr><td>Gateway JWT 入站授权</td><td><code>AuthorizerType: CUSTOM_JWT</code>（两轮部署）</td></tr>
+      <tr><td>MCP server 注册</td><td><code>AWS::AppIntegrations::Application</code>（MCP_SERVER）</td></tr>
+      <tr><td>集成关联（App / Lex bot / Wisdom assistant）</td><td><code>AWS::Connect::IntegrationAssociation</code></td></tr>
+      <tr><td>Lex V2 bot + version + alias</td><td><code>AWS::Lex::Bot / BotVersion / BotAlias</code></td></tr>
+      <tr><td>Contact Flow（含 QInConnect 会话）</td><td><code>AWS::Connect::ContactFlow</code>（State=ACTIVE）</td></tr>
+      <tr><td>AI agent 全链路</td><td><code>AWS::Wisdom::Assistant / AIPrompt / AIAgent</code></td></tr>
+      <tr><td>security profile（MCP 工具授权）</td><td><code>AWS::Connect::SecurityProfile</code></td></tr>
+      <tr><td>公网入口</td><td><code>CloudFront + S3(OAC) + API Gateway</code></td></tr>
+      <tr><td>AI agent 日志投递</td><td><code>AWS::Logs::DeliverySource / Destination / Delivery</code></td></tr>
+    </table>
+
+    <div class="lane-h"><span class="pill sdk">SDK / 控制台</span> CloudFormation 未覆盖，用 API 或控制台补齐</div>
+    <table class="tbl">
+      <tr><th style="width:42%">要做的事</th><th>方式（已封装进 CDK 的 AwsCustomResource）</th></tr>
+      <tr><td>AI agent ↔ security profile 关联</td><td><code>connect associate-security-profiles</code>（EntityType=AI_AGENT；角色需 <code>wisdom:GetAiAgent</code>）</td></tr>
+      <tr><td>把 orchestrator 设为默认 Self-Service agent</td><td><code>qconnect update-assistant-ai-agent</code>（orchestratorUseCase = <code>Connect.SelfService</code>）</td></tr>
+      <tr><td>AI agent 的 MCP 工具挂载</td><td>ToolId 必须是 <code>gateway_&lt;gatewayId&gt;__&lt;target&gt;___&lt;tool&gt;</code>；需 JWT 链就绪后 QConnect 才能枚举工具</td></tr>
+      <tr><td>启用 Connect Customer 实例</td><td>仅控制台（无 API）；本演示用 emergency 登录进 admin 网站</td></tr>
+    </table>
+  </section>
+
+  <section class="wrap">
+    <div class="eyebrow">Tuning · 调优与踩坑细节</div>
+    <h2 class="display">让它“像样”的那些细节</h2>
+    <p class="lead" style="margin-top:.5rem">从能跑通到好用，逐一实机验证出来的经验。</p>
+    <div class="grid grid-2" style="margin-top:1.3rem">
+      <div class="card tune"><h3>🎬 单一开场白 + 连接中状态</h3><p>Set voice 用 Matthew 播开场白，避免浏览器 TTS 造成“女声开场、男声回答”的割裂。<span class="why">代价：首次约 3–4 秒冷启动 —— 用一个脉冲式「⏳ 连接中」状态盖住，直到首次听到 Matthew 才切换。</span></p></div>
+      <div class="card tune"><h3>💭 音量推断的状态机</h3><p>用 Chime 的 realtime volume indicator（而非对 Chime 占用的 audio 元素做 Web Audio 分析）判断听/想/答，带迟滞与衰减防抖。<span class="why">Connect 不向浏览器推事件，状态只能由音量推断。</span></p></div>
+      <div class="card tune"><h3>📝 字幕两边都取自日志</h3><p>不做浏览器本地识别——那样无法反映 Connect 真实听到的。改为轮询 <code>/transcript</code>，从 AI agent 日志取 CUSTOMER/BOT 文本。<span class="why">用 <code>FilterLogEvents</code>（近实时、非索引查询），比 Logs Insights 快；延迟主要来自 Connect 的日志投递。</span></p></div>
+      <div class="card tune"><h3>🔑 Q 会话必须显式创建</h3><p>Flow 里在 Get customer input 前加 <code>CreateWisdomSession</code>，并把 session-arn 经 <code>LexSessionAttributes</code> 传给 <code>x-amz-lex:q-in-connect:session-arn</code>。<span class="why">否则 Lex 报“needs active session for Q In Connect”。</span></p></div>
+      <div class="card tune"><h3>🧱 Lex locale 要可 build</h3><p>只有 FallbackIntent 的 locale 无法构建；加一个带 utterance 的自定义 intent 才能 build，alias 指向已 build 的编号 version（不能指向 DRAFT）。<span class="why">alias 还需显式启用 en_US locale，否则运行时报未启用。</span></p></div>
+      <div class="card tune"><h3>🔐 JWT 授权的两条硬约束</h3><p>Gateway 的 AuthorizerType 创建后不可改，且 MCP application 的 URL 绑定 Gateway 无法迁移——切 JWT 时整链替换。allowedAudience = Gateway ID。<span class="why">自定义 Lex 角色还需补 <code>wisdom:CreateSession/GetAssistant/SendMessage/GetNextMessage</code>。</span></p></div>
+      <div class="card tune"><h3>🗣️ 选组件化 agentic voice</h3><p>bot 的 speech 选 Amazon Connect agentic voice，而非 Connect 里也提供的 voice-to-voice（Nova Sonic S2S）选项。<span class="why">本方案刻意用组件化的语音+编排，而非单一 voice-to-voice 模型。</span></p></div>
+      <div class="card tune"><h3>🛡️ 只走 CloudFront 的合规入口</h3><p>最初的 Lambda Function URL 被账号安全策略自动封堵；改为 CloudFront → S3(OAC) 静态站 + API Gateway，无任何公开 Function URL。<span class="why">S3 开启 Block Public Access，仅经 OAC 访问。</span></p></div>
+    </div>
+    <div style="margin-top:1.6rem; display:flex; gap:.8rem; flex-wrap:wrap">
+      <a class="btn btn-primary" href="index.html">▶ 打开实时演示</a>
+      <a class="btn btn-ghost" href="architecture.html">回到架构</a>
+    </div>
+  </section>
+
+  <div class="footer"><div class="wrap">Amazon Connect 语音 AI 演示 · 沙箱环境 · 仅供方案演示</div></div>
+</body>
+</html>

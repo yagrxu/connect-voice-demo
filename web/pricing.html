@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>费用估算 · Connect 语音 AI</title>
+  <link rel="stylesheet" href="site.css">
+  <style>
+    .calc { display:grid; grid-template-columns: 1fr 1fr; gap:1.25rem; margin-top:1.5rem; align-items:start; }
+    @media (max-width: 900px){ .calc { grid-template-columns:1fr; } }
+    .field { margin-bottom:1.1rem; }
+    .field label { display:flex; justify-content:space-between; align-items:baseline; font-weight:600; font-size:.92rem; margin-bottom:.35rem; }
+    .field label .val { font-family:var(--mono); color:var(--orange-deep); font-size:.9rem; }
+    .field input[type=range]{ width:100%; accent-color: var(--orange); }
+    .field .hint { font-size:.78rem; color:var(--muted); margin-top:.2rem; }
+    .rate { display:flex; align-items:center; gap:.5rem; font-size:.9rem; margin:.5rem 0; }
+    .rate input[type=number]{ width:6.5rem; font-family:var(--mono); padding:.35rem .5rem; border:1px solid var(--line);
+      border-radius:8px; background:var(--paper); color:var(--ink); }
+    .rate .nm { flex:1; }
+    .rate .unit { font-family:var(--mono); font-size:.76rem; color:var(--muted); flex:0 0 8.5rem; }
+    .result { position: sticky; top: 5rem; }
+    .total { font-family:var(--display); font-size:2.6rem; font-weight:700; color:var(--ink); letter-spacing:-.02em; }
+    .total small { font-family:var(--sans); font-size:1rem; color:var(--muted); font-weight:500; }
+    .bd { width:100%; border-collapse:collapse; margin-top:1rem; font-size:.9rem; }
+    .bd td { padding:.5rem .2rem; border-bottom:1px solid var(--line); }
+    .bd td:last-child { text-align:right; font-family:var(--mono); }
+    .bd tr:last-child td { border-bottom:none; font-weight:700; }
+    .bar { height:8px; border-radius:4px; background:var(--paper-2); overflow:hidden; margin-top:.2rem; display:flex; }
+    .bar span { height:100%; }
+    .disclaimer { background:#fff7ec; border:1px solid #f3d6a4; border-radius:12px; padding:.9rem 1.1rem; font-size:.86rem; color:#7a5200; margin-top:1.2rem; }
+    details.rates { margin-top:1rem; } details.rates summary { cursor:pointer; font-weight:600; font-size:.9rem; color:var(--ink-2); }
+  </style>
+</head>
+<body>
+  <nav class="nav"><div class="nav-inner">
+    <a class="brand" href="index.html"><span class="spark">◆</span> Connect 语音 AI</a>
+    <div class="nav-links">
+      <a href="index.html">演示</a>
+      <a href="product.html">产品介绍</a>
+      <a href="architecture.html">架构</a>
+      <a href="deployment.html">部署与调优</a>
+      <a href="pricing.html" class="active">费用估算</a>
+    </div>
+  </div></nav>
+
+  <div class="wrap reveal" style="padding-top:2.5rem">
+    <div class="eyebrow">Pricing · 月度成本估算</div>
+    <h1 class="display">拨一拨，看月度成本。</h1>
+    <p class="lead" style="margin-top:.8rem">
+      按你的用量估算这套方案的每月费用。单价均可编辑——请以 <a href="https://aws.amazon.com/connect/pricing/" target="_blank" rel="noopener">AWS 官方定价</a> 与你所在区域为准。此处默认值仅为量级示例。
+    </p>
+
+    <div class="calc">
+      <!-- inputs -->
+      <div class="card">
+        <h3>用量</h3>
+        <div class="field" style="margin-top:.8rem">
+          <label>每月对话数 <span class="val" id="vConv">3,000</span></label>
+          <input type="range" id="conv" min="100" max="100000" step="100" value="3000">
+          <div class="hint">一次“对话”＝用户与 AI 的一通语音交互。</div>
+        </div>
+        <div class="field">
+          <label>平均每次对话时长 <span class="val" id="vMin">2.0 分钟</span></label>
+          <input type="range" id="mins" min="0.5" max="15" step="0.5" value="2">
+          <div class="hint">决定语音（agentic voice）与 web calling 分钟数。</div>
+        </div>
+        <div class="field">
+          <label>平均每次对话 LLM tokens <span class="val" id="vTok">4,000</span></label>
+          <input type="range" id="tok" min="500" max="40000" step="500" value="4000">
+          <div class="hint">AI agent 推理的输入+输出 token（含工具往返）。</div>
+        </div>
+
+        <details class="rates">
+          <summary>调整单价（示例值，可编辑）</summary>
+          <div class="rate"><span class="nm">Connect 语音自助（agentic voice）</span><input type="number" id="rVoice" value="0.018" step="0.001"><span class="unit">$/分钟</span></div>
+          <div class="rate"><span class="nm">Web calling 媒体（Chime WebRTC）</span><input type="number" id="rChime" value="0.0017" step="0.0001"><span class="unit">$/分钟</span></div>
+          <div class="rate"><span class="nm">Bedrock 模型（AI agent, Claude Haiku 档）</span><input type="number" id="rTok" value="1.20" step="0.05"><span class="unit">$/百万 token</span></div>
+          <div class="rate"><span class="nm">其它基础设施（Lambda/APIGW/CF/S3/日志）</span><input type="number" id="rInfra" value="0.0008" step="0.0001"><span class="unit">$/对话</span></div>
+          <div class="rate"><span class="nm">固定月成本（CloudFront/日志留存等）</span><input type="number" id="rFixed" value="5" step="1"><span class="unit">$/月</span></div>
+        </details>
+      </div>
+
+      <!-- result -->
+      <div class="card accent result">
+        <h3>预计每月费用</h3>
+        <div class="total" style="margin-top:.4rem">$<span id="grand">0</span><small>/月</small></div>
+        <div class="muted" style="font-size:.86rem; margin-top:.2rem">≈ 单次对话 $<span id="perConv">0</span></div>
+        <div class="bar" id="bar" style="margin-top:1rem"></div>
+        <table class="bd">
+          <tr><td>语音自助（agentic voice）</td><td>$<span id="cVoice">0</span></td></tr>
+          <tr><td>Web calling 媒体</td><td>$<span id="cChime">0</span></td></tr>
+          <tr><td>Bedrock 模型（AI agent）</td><td>$<span id="cTok">0</span></td></tr>
+          <tr><td>其它基础设施</td><td>$<span id="cInfra">0</span></td></tr>
+          <tr><td>固定月成本</td><td>$<span id="cFixed">0</span></td></tr>
+          <tr><td>合计</td><td>$<span id="cTotal">0</span></td></tr>
+        </table>
+      </div>
+    </div>
+
+    <div class="disclaimer">
+      ⚠️ <strong>免责声明</strong>：本估算器仅用于量级参考。实际费用取决于 AWS 区域、具体计费模式（如 Connect 按对话/按分钟、Bedrock 输入与输出 token 分别计价、跨区域推理配置等）、承诺折扣与免费额度。请以 AWS 官方定价页与实际账单为准。
+    </div>
+    <div style="margin-top:1.4rem; display:flex; gap:.8rem; flex-wrap:wrap">
+      <a class="btn btn-primary" href="index.html">▶ 打开实时演示</a>
+      <a class="btn btn-ghost" href="architecture.html">看架构</a>
+    </div>
+  </div>
+
+  <div class="footer"><div class="wrap">Amazon Connect 语音 AI 演示 · 沙箱环境 · 仅供方案演示</div></div>
+
+  <script>
+    const $ = id => document.getElementById(id);
+    const fmt = (n, d=2) => n.toLocaleString('en-US', {minimumFractionDigits:d, maximumFractionDigits:d});
+    const colors = ['#0a7d7d','#3b9c9c','#ff9900','#ec7211','#c4bdae'];
+
+    function calc() {
+      const conv = +$('conv').value;
+      const mins = +$('mins').value;
+      const tok  = +$('tok').value;
+      $('vConv').textContent = conv.toLocaleString();
+      $('vMin').textContent = mins.toFixed(1) + ' 分钟';
+      $('vTok').textContent = tok.toLocaleString();
+
+      const rVoice = +$('rVoice').value, rChime = +$('rChime').value,
+            rTok = +$('rTok').value, rInfra = +$('rInfra').value, rFixed = +$('rFixed').value;
+
+      const totalMin = conv * mins;
+      const cVoice = totalMin * rVoice;
+      const cChime = totalMin * rChime;
+      const cTok   = conv * tok / 1e6 * rTok;
+      const cInfra = conv * rInfra;
+      const cFixed = rFixed;
+      const total  = cVoice + cChime + cTok + cInfra + cFixed;
+
+      $('cVoice').textContent = fmt(cVoice);
+      $('cChime').textContent = fmt(cChime);
+      $('cTok').textContent   = fmt(cTok);
+      $('cInfra').textContent = fmt(cInfra);
+      $('cFixed').textContent = fmt(cFixed);
+      $('cTotal').textContent = fmt(total);
+      $('grand').textContent  = fmt(total, total < 1000 ? 2 : 0);
+      $('perConv').textContent = fmt(conv ? total / conv : 0, 4);
+
+      const parts = [cVoice, cChime, cTok, cInfra, cFixed];
+      $('bar').innerHTML = parts.map((p,i) =>
+        `<span style="width:${total? (p/total*100):0}%;background:${colors[i]}"></span>`).join('');
+    }
+    document.querySelectorAll('input').forEach(el => el.addEventListener('input', calc));
+    calc();
+  </script>
+</body>
+</html>

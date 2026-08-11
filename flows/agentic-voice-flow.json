@@ -1,0 +1,65 @@
+{
+  "_comment": "Amazon Connect contact flow for the browser voice-AI demo. Valid Connect Flow Language (validated against CreateContactFlow). The CDK stack strips _comment keys and replaces BOT_ARN_PLACEHOLDER / WISDOM_ASSISTANT_ARN_PLACEHOLDER. Multilingual (en_US + zh_CN): the browser passes contact attributes language / voice / greeting via StartWebRTCContact; UpdateContactData sets the LanguageCode (selects the Lex locale), Set voice uses the per-language voice, and the greeting text is per-language. QInConnect session is created before Get customer input. Published as ACTIVE.",
+  "Version": "2019-10-30",
+  "StartAction": "logging",
+  "Metadata": {
+    "entryPointPosition": { "x": 20, "y": 20 },
+    "name": "ConnectVoiceDemo-AgenticVoice"
+  },
+  "Actions": [
+    {
+      "Identifier": "logging",
+      "Type": "UpdateFlowLoggingBehavior",
+      "Parameters": { "FlowLoggingBehavior": "Enabled" },
+      "Transitions": { "NextAction": "setlang" }
+    },
+    {
+      "Identifier": "setlang",
+      "Type": "UpdateContactData",
+      "Parameters": { "LanguageCode": "$.Attributes.langCode" },
+      "Transitions": {
+        "NextAction": "setvoice",
+        "Errors": [ { "NextAction": "setvoice", "ErrorType": "NoMatchingError" } ]
+      }
+    },
+    {
+      "Identifier": "setvoice",
+      "Type": "UpdateContactTextToSpeechVoice",
+      "Parameters": { "TextToSpeechVoice": "$.Attributes.voice" },
+      "Transitions": { "NextAction": "wisdom" }
+    },
+    {
+      "Identifier": "wisdom",
+      "Type": "CreateWisdomSession",
+      "Parameters": { "WisdomAssistantArn": "WISDOM_ASSISTANT_ARN_PLACEHOLDER" },
+      "Transitions": {
+        "NextAction": "getinput",
+        "Errors": [ { "NextAction": "getinput", "ErrorType": "NoMatchingError" } ]
+      }
+    },
+    {
+      "Identifier": "getinput",
+      "Type": "ConnectParticipantWithLexBot",
+      "Parameters": {
+        "Text": "$.Attributes.greeting",
+        "LexV2Bot": { "AliasArn": "BOT_ARN_PLACEHOLDER" },
+        "LexSessionAttributes": {
+          "x-amz-lex:q-in-connect:session-arn": "$.Wisdom.SessionArn"
+        }
+      },
+      "Transitions": {
+        "NextAction": "disc",
+        "Errors": [
+          { "NextAction": "disc", "ErrorType": "NoMatchingError" },
+          { "NextAction": "disc", "ErrorType": "NoMatchingCondition" }
+        ]
+      }
+    },
+    {
+      "Identifier": "disc",
+      "Type": "DisconnectParticipant",
+      "Parameters": {},
+      "Transitions": {}
+    }
+  ]
+}

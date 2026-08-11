@@ -1,0 +1,22 @@
+{
+  "name": "connect-voice-demo-cdk",
+  "version": "1.0.0",
+  "description": "CDK app deploying a browser voice-AI demo on Amazon Connect (agentic voice + agentic self-service + MCP tools) as a Nova Sonic replacement.",
+  "type": "commonjs",
+  "bin": {
+    "connect-demo": "bin/app.js"
+  },
+  "scripts": {
+    "deploy": "cdk deploy --require-approval never",
+    "destroy": "cdk destroy --force",
+    "synth": "cdk synth",
+    "test": "python3 -m pytest lambda/tools -q"
+  },
+  "dependencies": {
+    "aws-cdk-lib": "^2.150.0",
+    "constructs": "^10.3.0"
+  },
+  "devDependencies": {
+    "aws-cdk": "^2.1135.1"
+  }
+}

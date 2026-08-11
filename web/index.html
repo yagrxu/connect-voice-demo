@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Connect 语音 AI 演示 · Home</title>
+    <link rel="stylesheet" href="site.css">
+    <style>
+        /* Demo-specific styles (light theme). The element IDs/classes here are
+           consumed by app.js — do not rename: startBtn stopBtn dot stateText
+           phase transcript turn/you/bot/who/txt log. */
+        .demo-hero { padding: 3rem 0 1.5rem; }
+        .demo-panel {
+            display: grid; grid-template-columns: 1.1fr .9fr; gap: 1.25rem;
+            align-items: start; margin-top: 1.5rem;
+        }
+        @media (max-width: 900px) { .demo-panel { grid-template-columns: 1fr; } }
+        .console {
+            background: var(--card); border: 1px solid var(--line); border-radius: var(--radius);
+            box-shadow: var(--shadow-lg); padding: 1.4rem; display: flex; flex-direction: column; gap: 1rem;
+        }
+        .controls { display: flex; gap: .8rem; align-items: center; flex-wrap: wrap; }
+        .status { display: flex; align-items: center; gap: .5rem; font-size: .88rem; color: var(--muted); margin-left: auto; }
+        .dot { width: 10px; height: 10px; border-radius: 50%; background: #c4bdae; transition: background .2s; }
+        .dot.connecting { background: var(--orange); }
+        .dot.active { background: var(--good); }
+        .dot.error { background: #d64545; }
+        .phase {
+            min-height: 3.4rem; display: flex; align-items: center; justify-content: center;
+            font-size: 1.25rem; font-weight: 600; border-radius: 12px;
+            background: var(--paper-2); color: var(--muted); transition: all .25s;
+            border: 1px solid var(--line);
+        }
+        .phase.connecting { background: #fff4e0; color: var(--orange-deep); border-color:#f3d6a4; animation: pulse 1.2s ease-in-out infinite; }
+        .phase.listening { background: #eaf6ee; color: var(--good); border-color:#bfe3cc; }
+        .phase.thinking  { background: #fbeede; color: var(--warn); border-color:#f0d3a8; animation: pulse 1s ease-in-out infinite; }
+        .phase.speaking  { background: var(--teal-soft); color: var(--teal); border-color:#b6ddda; }
+        @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: .55; } }
+        #transcript {
+            background: var(--paper); border: 1px solid var(--line); border-radius: 12px;
+            padding: .85rem 1rem; min-height: 8rem; max-height: 42vh; overflow-y: auto;
+            display: flex; flex-direction: column; gap: .55rem;
+        }
+        #transcript:empty::before { content: "对话字幕会显示在这里（双方均取自 Connect 日志，可对比识别与回答）"; color: var(--muted); font-size: .85rem; }
+        .turn { display: flex; gap: .6rem; font-size: .95rem; line-height: 1.45; }
+        .turn .who { flex: 0 0 4.8rem; font-weight: 700; font-family: var(--mono); font-size: .8rem; padding-top: .1rem; }
+        .turn.you .who { color: var(--good); }
+        .turn.bot .who { color: var(--teal); }
+        .turn .txt { color: var(--ink); }
+        #log {
+            font-family: var(--mono); font-size: .76rem; color: var(--muted);
+            background: var(--paper); border: 1px dashed var(--line); border-radius: 10px;
+            padding: .75rem .9rem; white-space: pre-wrap; word-break: break-word;
+            max-height: 24vh; overflow-y: auto;
+        }
+        .try-list { list-style: none; display: flex; flex-direction: column; gap: .55rem; }
+        .try-list li { display: flex; gap: .55rem; align-items: baseline; font-size: .95rem; }
+        .try-list .q { font-family: var(--mono); font-size: .82rem; background: var(--paper-2);
+            padding: .15rem .5rem; border-radius: 6px; color: var(--ink); }
+    </style>
+</head>
+<body>
+    <nav class="nav">
+      <div class="nav-inner">
+        <a class="brand" href="index.html"><span class="spark">◆</span> Connect 语音 AI</a>
+        <div class="nav-links">
+          <a href="index.html" class="active">演示</a>
+          <a href="product.html">产品介绍</a>
+          <a href="architecture.html">架构</a>
+          <a href="deployment.html">部署与调优</a>
+          <a href="pricing.html">费用估算</a>
+        </div>
+      </div>
+    </nav>
+
+    <div class="wrap demo-hero reveal">
+      <div class="eyebrow">Live Demo · 浏览器语音 AI</div>
+      <h1 class="display">对着浏览器说话，<br>让 Amazon Connect 上的 AI 回答你。</h1>
+      <p class="lead" style="margin-top:1rem">
+        无需电话号码、无需安装。点击开始，用麦克风提问时间或天气——语音识别、AI 推理、工具调用、语音回复，全部跑在 Amazon Connect 的 agentic voice 与 AI agent 上。相比用单一 voice-to-voice 模型（如 Nova 2 Sonic）端到端处理，这里用 Connect 的组件化 agentic 能力实现同等体验。
+      </p>
+
+      <div class="demo-panel">
+        <div class="console">
+          <div class="controls">
+            <label for="lang" style="font-size:.85rem;color:var(--muted);display:flex;align-items:center;gap:.4rem">
+              语言
+              <select id="lang" style="font-family:var(--sans);font-size:.9rem;padding:.45rem .6rem;border:1px solid var(--line);border-radius:8px;background:var(--paper);color:var(--ink)">
+                <option value="en_US">English</option>
+                <option value="zh_CN">中文（普通话）</option>
+              </select>
+            </label>
+            <button id="startBtn" class="btn btn-primary">▶ 开始通话</button>
+            <button id="stopBtn" class="btn btn-ghost" disabled>■ 结束</button>
+            <span class="status"><span class="dot" id="dot"></span><span id="stateText">idle</span></span>
+          </div>
+          <div class="phase" id="phase"></div>
+          <div id="transcript"></div>
+          <div id="log"></div>
+        </div>
+
+        <div style="display:flex; flex-direction:column; gap:1.1rem">
+          <div class="card">
+            <h3>试试这样问</h3>
+            <ul class="try-list" style="margin-top:.6rem">
+              <li><span class="q">"What time is it in Tokyo?"</span></li>
+              <li><span class="q">"What's the weather in Seattle?"</span></li>
+              <li><span class="q">"Weather in Paris and time in New York?"</span></li>
+            </ul>
+            <p class="muted" style="font-size:.85rem; margin-top:.8rem">
+              建议使用 Chrome / Edge / Firefox，并允许麦克风权限。首次接通约 3–4 秒（Connect 建立会话），期间显示“连接中”。
+            </p>
+          </div>
+          <div class="card accent">
+            <h3>状态指示怎么读</h3>
+            <p class="muted" style="font-size:.9rem; margin-top:.4rem">
+              ⏳ 连接中 · 🎙️ 正在听你说 · 💭 思考中（已听到、正在推理）· 🔊 正在回答。<br>
+              状态由麦克风/扬声器音量实时推断，字幕几秒内从 Connect 日志补齐。
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="footer">
+      <div class="wrap">Amazon Connect 语音 AI 演示 · 沙箱环境 · 仅供方案演示</div>
+    </div>
+
+    <!-- Amazon Chime SDK for JavaScript is imported as an ES module inside
+         app.js (there is no official UMD/global CDN build). -->
+    <script type="module" src="app.js"></script>
+</body>
+</html>
