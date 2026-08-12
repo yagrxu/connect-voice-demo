@@ -67,6 +67,7 @@
           <a href="index.html" class="active">演示</a>
           <a href="product.html">产品介绍</a>
           <a href="architecture.html">架构</a>
+          <a href="gateway.html">IoT 设备接入</a>
           <a href="deployment.html">部署与调优</a>
           <a href="pricing.html">费用估算</a>
         </div>
@@ -78,6 +79,9 @@
       <h1 class="display">对着浏览器说话，<br>让 Amazon Connect 上的 AI 回答你。</h1>
       <p class="lead" style="margin-top:1rem">
         无需电话号码、无需安装。点击开始，用麦克风提问时间或天气——语音识别、AI 推理、工具调用、语音回复，全部跑在 Amazon Connect 的 agentic voice 与 AI agent 上。相比用单一 voice-to-voice 模型（如 Nova 2 Sonic）端到端处理，这里用 Connect 的组件化 agentic 能力实现同等体验。
+      </p>
+      <p class="muted" style="margin-top:.6rem; font-size:.95rem">
+        这是<strong>①浏览器直连线</strong>。另有<strong>②IoT 设备接入线</strong>：真实设备经 voice gateway 鉴权后接入同一套后端 → <a href="gateway.html">IoT 设备接入演示 →</a>
       </p>
 
       <div class="demo-panel">
@@ -117,6 +121,14 @@
               ⏳ 连接中 · 🎙️ 正在听你说 · 💭 思考中（已听到、正在推理）· 🔊 正在回答。<br>
               状态由麦克风/扬声器音量实时推断，字幕几秒内从 Connect 日志补齐。
             </p>
+          </div>
+          <div class="card" style="border-top:3px solid #1f8a4c">
+            <div class="ic" style="background:#eaf6ee;color:#1f8a4c">📟</div>
+            <h3>另一条线：IoT 设备接入</h3>
+            <p class="muted" style="font-size:.9rem; margin-top:.2rem">
+              把语音能力抽象成独立 voice gateway：真实设备（EC2）向 IoT Core 拿短期票、经网关验票接入同一套后端。信令/媒体分离，网页充当设备麦克风。
+            </p>
+            <a class="btn btn-ghost" href="gateway.html" style="margin-top:.8rem">看 IoT 设备接入演示 →</a>
           </div>
         </div>
       </div>

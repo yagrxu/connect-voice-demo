@@ -29,6 +29,7 @@
       <a href="index.html">演示</a>
       <a href="product.html">产品介绍</a>
       <a href="architecture.html">架构</a>
+      <a href="gateway.html">IoT 设备接入</a>
       <a href="deployment.html" class="active">部署与调优</a>
           <a href="pricing.html">费用估算</a>
     </div>
@@ -49,15 +50,21 @@
         <strong>前置</strong>：目标账号/区域启用 <strong>Connect Customer</strong>（下一代实例，agentic voice / AI agent designer 的前提，仅控制台）；Bedrock 控制台开通所需模型访问。
       </div></div>
       <div class="dstep"><div class="n"></div><div class="c">
-        <strong>首次部署（Gateway = NONE）</strong>：<code>npm run deploy -- -c enableAiAgent=true</code>。建好工具/Gateway/MCP 注册/Lex/Flow/AI agent 全链路，输出 Gateway ID。
+        <strong>首次部署（AgentCore Gateway = NONE）</strong>：<code>npm run deploy -- -c enableAiAgent=true</code>。建好工具 / <strong>AgentCore Gateway</strong>（即 MCP 网关，注意与下方的 voice gateway 不是一回事）/ MCP 注册 / Lex / Flow / AI agent 全链路，输出 Gateway ID。
       </div></div>
       <div class="dstep"><div class="n"></div><div class="c">
-        <strong>切 JWT（第二轮）</strong>：<code>-c jwtDiscoveryUrl=…/.well-known/openid-configuration -c jwtAudience=&lt;gateway id&gt;</code>。Gateway 的 AuthorizerType 不可原地改，CDK 会整套替换为 CUSTOM_JWT。
+        <strong>切 JWT（第二轮）</strong>：<code>-c jwtDiscoveryUrl=…/.well-known/openid-configuration -c jwtAudience=&lt;gateway id&gt;</code>。<strong>AgentCore Gateway</strong> 的 AuthorizerType 不可原地改，CDK 会整套替换为 CUSTOM_JWT。
+      </div></div>
+      <div class="dstep"><div class="n" style="background:#eaf6ee;color:#1f8a4c;border-color:#bfe3cc"></div><div class="c">
+        <strong style="color:#1f8a4c">（可选）开第二条线</strong>：追加 <code>-c enableGateway=true</code>。额外拉起 <strong>voice gateway</strong>（API Gateway WebSocket + Lambda）、EC2 设备主机（常驻 <code>device.js</code>，经 SSM 管理免 SSH）、IoT Thing、两张 DynamoDB 表。默认不带此开关，零新增资源。
       </div></div>
       <div class="dstep"><div class="n"></div><div class="c">
         <strong>SDK / 控制台补齐</strong>：AI agent ↔ security profile 关联、设为默认 self-service、工具挂载（见下表）。多数已封装进 <code>AwsCustomResource</code> 随 CDK 执行。
       </div></div>
     </div>
+    <p class="muted" style="font-size:.85rem;margin-top:1rem">
+      ⚠️ 术语消歧：本页两个“网关”。<strong>AgentCore Gateway</strong> = 把工具以 MCP 暴露给 AI agent 的托管网关（带 CUSTOM_JWT）；<strong>voice gateway</strong> = 第二条线里设备接入的 API Gateway WebSocket + Lambda。两者独立，勿混。
+    </p>
   </section>
 
   <section class="wrap">
@@ -78,6 +85,12 @@
       <tr><td>security profile（MCP 工具授权）</td><td><code>AWS::Connect::SecurityProfile</code></td></tr>
       <tr><td>公网入口</td><td><code>CloudFront + S3(OAC) + API Gateway</code></td></tr>
       <tr><td>AI agent 日志投递</td><td><code>AWS::Logs::DeliverySource / Destination / Delivery</code></td></tr>
+      <tr><td colspan="2" style="background:#eaf6ee;font-weight:600;color:#1f8a4c">② IoT 设备接入线（<code>-c enableGateway=true</code>）</td></tr>
+      <tr><td>voice gateway（WebSocket + Lambda）</td><td><code>AWS::ApiGatewayV2::Api / Stage / Route</code> + <code>AWS::Lambda::Function</code></td></tr>
+      <tr><td>EC2 设备主机（常驻 device 进程，SSM 管理）</td><td><code>AWS::EC2::Instance / VPC / SecurityGroup</code>（仅出站 443）</td></tr>
+      <tr><td>IoT 设备 Thing（预置）</td><td><code>iot:CreateThing</code>（<code>AwsCustomResource</code>，含 onDelete）</td></tr>
+      <tr><td>设备密钥表 + 连接/配对状态表</td><td><code>AWS::DynamoDB::Table</code> ×2（devices + connections，含 deviceId GSI/TTL）</td></tr>
+      <tr><td>发票 / 网关配置端点</td><td><code>/issue-ticket</code> · <code>/gw-config</code>（webcall Lambda 新路由）</td></tr>
     </table>
 
     <div class="lane-h"><span class="pill sdk">SDK / 控制台</span> CloudFormation 未覆盖，用 API 或控制台补齐</div>
@@ -102,7 +115,11 @@
       <div class="card tune"><h3>🧱 Lex locale 要可 build</h3><p>只有 FallbackIntent 的 locale 无法构建；加一个带 utterance 的自定义 intent 才能 build，alias 指向已 build 的编号 version（不能指向 DRAFT）。<span class="why">alias 还需显式启用 en_US locale，否则运行时报未启用。</span></p></div>
       <div class="card tune"><h3>🔐 JWT 授权的两条硬约束</h3><p>Gateway 的 AuthorizerType 创建后不可改，且 MCP application 的 URL 绑定 Gateway 无法迁移——切 JWT 时整链替换。allowedAudience = Gateway ID。<span class="why">自定义 Lex 角色还需补 <code>wisdom:CreateSession/GetAssistant/SendMessage/GetNextMessage</code>。</span></p></div>
       <div class="card tune"><h3>🗣️ 选组件化 agentic voice</h3><p>bot 的 speech 选 Amazon Connect agentic voice，而非 Connect 里也提供的 voice-to-voice（Nova Sonic S2S）选项。<span class="why">本方案刻意用组件化的语音+编排，而非单一 voice-to-voice 模型。</span></p></div>
-      <div class="card tune"><h3>🛡️ 只走 CloudFront 的合规入口</h3><p>最初的 Lambda Function URL 被账号安全策略自动封堵；改为 CloudFront → S3(OAC) 静态站 + API Gateway，无任何公开 Function URL。<span class="why">S3 开启 Block Public Access，仅经 OAC 访问。</span></p></div>
+      <div class="card tune"><h3>🛡️ 只走 CloudFront 的合规入口</h3><p>最初的 Lambda Function URL 被账号安全策略自动封堵；改为 CloudFront → S3(OAC) 静态站 + API Gateway，无任何公开 Function URL。<span class="why">S3 开启 Block Public Access，仅经 OAC 访问。第二条线的 voice gateway WebSocket 端点面向<strong>设备</strong>（非浏览器公网页面），由票据鉴权把关。</span></p></div>
+      <div class="card tune" style="border-top:3px solid #1f8a4c"><h3>📟 设备端要 Node 22（全局 WebSocket）</h3><p>device 进程用 Node 22 内置的全局 <code>fetch</code>/<code>WebSocket</code>，零依赖。但 AL2023 默认装的是 Node 18（无全局 WebSocket），UserData 必须先移除再从 NodeSource 装 22。<span class="why">否则设备日志一直报 <code>WebSocket is not defined</code>、拿到票却连不上网关。</span></p></div>
+      <div class="card tune" style="border-top:3px solid #1f8a4c"><h3>🔌 $connect 不能 postToConnection</h3><p>API Gateway WebSocket 在 <code>$connect</code> 阶段那条连接尚未就绪，无法向它推消息。观测页连上后要主动发一条 <code>hello</code>（在 <code>$default</code> 里回），才能拿到设备在线状态与会话信息。<span class="why">否则「加入音频」一直是暗的——推送全部静默丢失。</span></p></div>
+      <div class="card tune" style="border-top:3px solid #1f8a4c"><h3>🎫 票据即鉴权，媒体不裸奔</h3><p>设备→网关用 IoT Core 短期票（网关本地验，0 回调）；<code>StartWebRTCContact</code> 只有网关 IAM 能调、且仅验票后调；网页→Connect 的媒体靠一次性 <code>ParticipantToken</code>。<span class="why">join info 只定向推给配对 observer，不广播——攻击者拿不到就建不了媒体流。</span></p></div>
+      <div class="card tune" style="border-top:3px solid #1f8a4c"><h3>🔔 设备待命，由观众唤醒</h3><p>设备连上网关后不自动起会话，而是等观测页发 <code>wake</code> 才发起——贴近真实设备“被触发/唤醒词唤醒”才工作，也避免无人观看时空烧 Connect 费用。<span class="why">配合 SESSION 缓存（短 TTL）给迟到的观测页补发当前会话。</span></p></div>
     </div>
     <div style="margin-top:1.6rem; display:flex; gap:.8rem; flex-wrap:wrap">
       <a class="btn btn-primary" href="index.html">▶ 打开实时演示</a>

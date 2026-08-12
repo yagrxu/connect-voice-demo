@@ -48,6 +48,26 @@ npm run deploy
 > **几乎全链路 CDK 化。** 仅剩两件运行时小事（CFN 无法在部署期完成）：Gateway 的 **JWT 入站授权**（已 CDK 化，两轮部署）；以及 JWT 就绪后在控制台**把 MCP 工具挂到 AI agent** + bot 上启用 agentic voice。详见 [`docs/console-setup.md`](docs/console-setup.md)。
 > 若复用已存在的 Connect 实例（避免账号实例配额）：追加 `-c instanceId=<你的实例 id>`。
 
+## 第二条线：IoT 设备接入语音网关（可选）
+
+默认部署是「人对着浏览器说话」。加 `-c enableGateway=true` 会额外拉起一条**贴近客户真实链路**的线：把语音能力后面隐含的 **voice gateway** 抽象成独立组件，演示一个注册的 IoT 设备如何鉴权接入。
+
+```bash
+npx cdk deploy -c enableGateway=true -c enableAiAgent=true \
+  -c jwtDiscoveryUrl=... -c jwtAudience=... --require-approval never
+```
+
+会额外建好：
+- **voice gateway** = API Gateway **WebSocket API + Lambda**（真长连接、serverless）。`$connect` 验设备票，`start-call` 时调 `StartWebRTCContact`，把 Chime 加入信息**只定向推**给配对的观测网页。
+- **IoT 设备** = 一台 **EC2**（t3.micro，AL2023）上的常驻 Node 进程（`device/device.js`），先 `POST /issue-ticket` 拿短期票（模拟 IoT Core 发票，Mode A），再用 WebSocket 长连接接入网关。经 **SSM Session Manager** 管理（无 SSH / 22 端口）。
+- **两张 DynamoDB 表**（设备密钥 + WS 连接注册）、预置的 IoT **Thing**（`speaker-001`）。
+
+**鉴权模型（无任何一跳裸奔）**：设备→网关用短期票（网关本地验，0 次回调 IoT Core）；`StartWebRTCContact` 只有网关 IAM 角色能调、且仅在验票通过后调（堵上原本开放的 `/webcall`）；网页→Connect 的媒体流靠 Connect 校验一次性 `ParticipantToken`（网关验票后才签发）。票据里的 HMAC 与 AgentCore 的 OIDC JWT 无关，只守 device↔gateway 的 WebSocket。移植自姊妹 demo `../cdk`（vgauth）的验票纯函数。
+
+**验证**：打开 `ObserverPageUrl`（`/gateway.html`）点「连接网关（观测）」→ EC2 设备上线后「加入音频」亮起 → 点击用麦克风与 AI 对话。设备与网页是两个独立进程，只靠配对码 `speaker-001` 在网关处会合。
+
+> ⚠️ EC2 常驻是这条线唯一的持续成本（t3.micro）；不演示时可停/终止实例。默认部署（不带 `-c enableGateway=true`）不产生任何新增资源。
+
 ## 试试这些提示
 
 打开 `WebAppUrl` → 点 **Start**（授权麦克风）→ 说：
@@ -71,8 +91,10 @@ npm run synth     # CDK 合成，验证模板无误
 | `lib/connect-demo-stack.js` | 全部基建：工具 Lambda、AgentCore Gateway(MCP)、Connect 实例、web 后端；CloudFront（唯一入口）→ S3 静态站 + API Gateway |
 | `lambda/tools/tools.py` | 两个工具的纯函数（复用自原 demo，确定性、无外部 API） |
 | `lambda/tools/handler.py` | MCP 工具入口，按工具名路由 |
-| `lambda/webcall/handler.js` | 发起 web call（`StartWebRTCContact`），经 API Gateway 暴露 |
-| `web/` | 浏览器页面（托管在 S3，经 CloudFront）：Start/Stop + Amazon Chime SDK WebRTC |
+| `lambda/webcall/handler.js` | 发起 web call（`StartWebRTCContact`），经 API Gateway 暴露；含 `/issue-ticket` `/gw-config` |
+| `lambda/gateway/` | voice gateway 的 WebSocket Lambda（`handler.js`）+ 移植的验票纯函数（`auth.js`）—— 仅 `-c enableGateway=true` 时部署 |
+| `device/device.js` | EC2 上模拟的 IoT 设备进程（拿票 → WS 长连接 → 起会话）；零依赖，Node 22 全局 `fetch`/`WebSocket` |
+| `web/` | 浏览器页面（托管在 S3，经 CloudFront）：Start/Stop + Amazon Chime SDK WebRTC；`gateway.html` 是 IoT 线观测台 |
 | `flows/agentic-voice-flow.json` | 可导入的 Contact Flow 定义 |
 | `prompts/orchestration-prompt.md` | AI agent 的 orchestration prompt |
 | `docs/` | 架构说明 + 控制台补充步骤 |

@@ -31,6 +31,7 @@
       <a href="index.html">演示</a>
       <a href="product.html">产品介绍</a>
       <a href="architecture.html" class="active">架构</a>
+      <a href="gateway.html">IoT 设备接入</a>
       <a href="deployment.html">部署与调优</a>
           <a href="pricing.html">费用估算</a>
     </div>
@@ -39,10 +40,13 @@
   <div class="wrap reveal" style="padding-top:2.5rem">
     <div class="eyebrow">Architecture · 系统架构</div>
     <h1 class="display">整体架构总览</h1>
-    <p class="lead" style="margin-top:.8rem">唯一公网入口是 CloudFront。静态站在 S3（OAC 保护），API 走 API Gateway。语音与 AI 全部由 Amazon Connect 托管，工具以 MCP 暴露。</p>
+    <p class="lead" style="margin-top:.8rem">
+      同一套语音 AI 后端，两条接入线：<strong>①浏览器直连线</strong>——人对着网页说话，经 CloudFront（唯一公网入口，S3 用 OAC 保护、API 走 API Gateway）；<strong>②IoT 设备接入线</strong>——设备向 IoT Core 拿短期票，经 <strong>voice gateway（API Gateway WebSocket + Lambda）</strong>验票后接入。两条线共用同一个 Amazon Connect：语音与 AI 全部托管，工具以 MCP 暴露。
+    </p>
 
     <div class="legend">
       <span class="k"><span class="swatch" style="background:#eef4fb;border:1px solid #cfe0f2"></span> 浏览器 / 边缘</span>
+      <span class="k"><span class="swatch" style="background:#eaf6ee;border:1px solid #bfe3cc"></span> IoT 设备线（EC2 / IoT Core / 语音网关）</span>
       <span class="k"><span class="swatch" style="background:#fff4e0;border:1px solid #f3d6a4"></span> 我们的无服务器后端</span>
       <span class="k"><span class="swatch" style="background:var(--teal-soft);border:1px solid #b6ddda"></span> Amazon Connect 托管</span>
       <span class="k"><span class="swatch" style="background:#efe9fb;border:1px solid #d6c8f2"></span> Q in Connect / Bedrock</span>
@@ -52,7 +56,7 @@
   <!-- ============ OVERVIEW SVG ============ -->
   <div class="wrap">
     <div class="diagram">
-      <svg viewBox="0 0 980 470" role="img" aria-label="架构总览图">
+      <svg viewBox="0 0 980 640" role="img" aria-label="架构总览图">
         <defs>
           <marker id="arr" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto">
             <path d="M0,0 L8,3 L0,6 Z" fill="#ec7211"/>
@@ -60,22 +64,29 @@
           <marker id="arrT" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto">
             <path d="M0,0 L8,3 L0,6 Z" fill="#0a7d7d"/>
           </marker>
+          <marker id="arrG" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto">
+            <path d="M0,0 L8,3 L0,6 Z" fill="#1f8a4c"/>
+          </marker>
           <style>
             .lbl{font-family:'IBM Plex Sans','IBM Plex Sans SC',sans-serif;font-weight:600;fill:#232f3e;}
             .sub{font-family:'IBM Plex Mono',monospace;font-size:10px;fill:#6b7686;}
             .grp{font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.12em;fill:#6b7686;text-transform:uppercase;}
+            .grpn{font-family:'IBM Plex Sans','IBM Plex Sans SC',sans-serif;font-size:12px;font-weight:600;fill:#1f8a4c;}
+            .elbl{font-family:'IBM Plex Sans','IBM Plex Sans SC',sans-serif;font-size:11px;fill:#1f8a4c;}
             .edge{stroke:#ec7211;stroke-width:2;fill:none;}
             .edgeT{stroke:#0a7d7d;stroke-width:2;fill:none;}
+            .edgeG{stroke:#1f8a4c;stroke-width:2;fill:none;}
           </style>
         </defs>
 
         <!-- teal return arrow: Connect top -> browser top (routed high & clean) -->
-        <path class="edgeT" d="M620,150 C620,70 150,70 95,196" marker-end="url(#arrT)"/>
-        <text class="sub" x="250" y="58" fill="#0a7d7d">↩ WebRTC 语音回放（agentic voice 合成的音频）</text>
+        <path class="edgeT" d="M620,150 C560,66 230,80 138,196" marker-end="url(#arrT)"/>
+        <text class="sub" x="250" y="58" fill="#0a7d7d">↩ WebRTC 语音回放（agentic voice 合成的音频，回到承载媒体的浏览器）</text>
 
+        <!-- ===== LINE ① browser-direct ===== -->
         <!-- Browser -->
         <rect x="20" y="200" width="150" height="92" rx="12" fill="#eef4fb" stroke="#cfe0f2"/>
-        <text class="grp" x="24" y="192">CLIENT</text>
+        <text class="grp" x="24" y="192">① 浏览器直连线</text>
         <text class="lbl" x="36" y="238" font-size="14">🎙️ 浏览器</text>
         <text class="sub" x="34" y="260">Chime SDK · WebRTC</text>
         <text class="sub" x="34" y="276">Start / 字幕 / 状态</text>
@@ -95,13 +106,13 @@
 
         <!-- API GW + webcall lambda -->
         <rect x="386" y="212" width="160" height="80" rx="12" fill="#fff4e0" stroke="#f3d6a4"/>
-        <text class="lbl" x="400" y="240" font-size="13">API Gateway</text>
+        <text class="lbl" x="400" y="240" font-size="13">API Gateway（REST）</text>
         <text class="sub" x="400" y="260">/webcall · /transcript</text>
         <text class="sub" x="400" y="276">→ webcall Lambda</text>
 
         <!-- Connect instance (wider to avoid text overflow) -->
         <rect x="584" y="112" width="196" height="168" rx="12" fill="#e2f1f0" stroke="#b6ddda"/>
-        <text class="grp" x="588" y="104">AMAZON CONNECT · 托管</text>
+        <text class="grp" x="588" y="104">AMAZON CONNECT · 托管（两条线共用）</text>
         <text class="lbl" x="600" y="138" font-size="13">Connect 实例</text>
         <text class="sub" x="600" y="158">StartWebRTCContact</text>
         <text class="sub" x="600" y="174">Contact Flow</text>
@@ -112,7 +123,7 @@
 
         <!-- AI agent -->
         <rect x="584" y="312" width="196" height="92" rx="12" fill="#efe9fb" stroke="#d6c8f2"/>
-        <text class="grp" x="588" y="304">Q IN CONNECT · Bedrock</text>
+        <text class="grp" x="632" y="304">Q IN CONNECT · Bedrock</text>
         <text class="lbl" x="600" y="338" font-size="13">Orchestrator AI agent</text>
         <text class="sub" x="600" y="360">Claude · 多步推理</text>
         <text class="sub" x="600" y="376">AIPrompt + Guardrail</text>
@@ -136,13 +147,52 @@
         <path class="edge" d="M348,250 L382,250" marker-end="url(#arr)"/>
         <path class="edge" d="M546,250 L580,215" marker-end="url(#arr)"/>
         <!-- teal = voice/tool path -->
-        <path class="edgeT" d="M682,280 L682,308" marker-end="url(#arrT)"/>
+        <path class="edgeT" d="M600,282 L600,309" marker-end="url(#arrT)"/>
         <path class="edgeT" d="M780,358 L816,358" marker-end="url(#arrT)"/>
         <path class="edgeT" d="M895,312 L895,284" marker-end="url(#arrT)"/>
+
+        <!-- ===== LINE ② IoT device (green band below) ===== -->
+        <line x1="20" y1="438" x2="960" y2="438" stroke="#e6e1d6" stroke-dasharray="4 4"/>
+        <text class="grpn" x="20" y="462">② IoT 设备接入线（<tspan font-family="'IBM Plex Mono',monospace">-c enableGateway</tspan>，可选）</text>
+
+        <!-- IoT Core (ticket issuer — sits above the device as a side branch) -->
+        <rect x="20" y="486" width="150" height="66" rx="12" fill="#eaf6ee" stroke="#bfe3cc"/>
+        <text class="lbl" x="34" y="512" font-size="13">IoT Core</text>
+        <text class="sub" x="34" y="530">发短期票（Mode A）</text>
+        <text class="sub" x="34" y="544">scope=voice-stream</text>
+
+        <!-- IoT device (EC2) — widened so the text doesn't touch the edge -->
+        <rect x="250" y="486" width="200" height="66" rx="12" fill="#eaf6ee" stroke="#bfe3cc"/>
+        <text class="lbl" x="266" y="510" font-size="13">📟 IoT 设备</text>
+        <text class="sub" x="266" y="528">EC2 常驻进程 · speaker-001</text>
+        <text class="sub" x="266" y="544">仅信令（signaling-only）</text>
+
+        <!-- voice gateway — pushed right to open room for the ② label -->
+        <rect x="560" y="480" width="220" height="78" rx="12" fill="#eaf6ee" stroke="#1f8a4c" stroke-width="1.5"/>
+        <text class="lbl" x="574" y="504" font-size="13" fill="#1f8a4c">voice gateway</text>
+        <text class="sub" x="574" y="522">API Gateway WebSocket + Lambda</text>
+        <text class="sub" x="574" y="538">验票 · 会话编排</text>
+        <text class="sub" x="574" y="552">StartWebRTCContact（收口）</text>
+
+        <!-- ① device asks IoT Core for a ticket (short arrow, label above) -->
+        <path class="edgeG" d="M250,519 L174,519" marker-end="url(#arrG)"/>
+        <text class="elbl" x="180" y="510">①拿票</text>
+        <!-- ② device -> gateway:带票长连接 (main signaling hop; gap now 110px) -->
+        <path class="edgeG" d="M450,519 L556,519" marker-end="url(#arrG)"/>
+        <text class="elbl" x="458" y="510">②带票长连接</text>
+        <!-- ④ gateway -> Connect: verified, StartWebRTCContact (up the right side into shared Connect) -->
+        <path class="edgeG" d="M780,505 C830,505 830,320 830,300 C830,286 800,284 780,282" marker-end="url(#arrG)"/>
+        <text class="elbl" x="808" y="452">④验票后</text>
+        <text class="elbl" x="808" y="470">StartWebRTCContact</text>
+        <!-- ⑤ gateway -> browser: join info, browser carries media. Routed from the
+             gateway TOP, crossing the separator to the RIGHT of the title (x~500),
+             then sweeping left to the browser bottom — clear of the title text. -->
+        <path class="edgeG" d="M560,480 C560,370 260,352 95,296" stroke-dasharray="6 6" marker-end="url(#arrG)"/>
+        <text class="elbl" x="250" y="392">⑤加入信息 → 浏览器承载媒体（信令/媒体分离）</text>
       </svg>
     </div>
     <p class="muted" style="font-size:.85rem;margin-top:.6rem">
-      橙色箭头＝控制/HTTP 路径；青色箭头＝语音与工具调用路径。浏览器媒体流经 WebRTC 与 Connect 双向流动。
+      <span style="color:#ec7211;font-weight:600">橙色</span>＝浏览器直连线的控制/HTTP；<span style="color:#0a7d7d;font-weight:600">青色</span>＝语音与工具调用；<span style="color:#1f8a4c;font-weight:600">绿色</span>＝IoT 设备接入线的信令。两条线共用同一个 Connect 后端；音频始终经 WebRTC 在<strong>浏览器</strong>与 Connect 之间双向流动——设备线里浏览器充当设备的麦克风/扬声器（信令与媒体分离）。
     </p>
   </div>
 
@@ -244,7 +294,10 @@
   <section class="wrap">
     <div class="eyebrow">Scenario Data Flow · 场景数据流（核心）</div>
     <h2 class="display">一次语音提问，数据怎么走</h2>
-    <p class="lead" style="margin-top:.6rem">以“西雅图天气怎么样？”为例，从点击开始到听见回答的完整链路。</p>
+    <p class="lead" style="margin-top:.6rem">以“西雅图天气怎么样？”为例，走 <strong>①浏览器直连线</strong>，从点击开始到听见回答的完整链路。</p>
+    <p class="muted" style="font-size:.9rem;margin-top:.4rem">
+      <strong>②IoT 设备接入线</strong>只有<em>入口第 1 步</em>不同：不是浏览器直接调开放的 <code>/webcall</code>，而是设备带票连上 voice gateway、由网关验票后代为调用 <code>StartWebRTCContact</code>（<code>/webcall</code> 的开放触发被收口到网关）。从第 2 步起两条线完全一致——同一个 Contact Flow、同一套 AI agent 与工具。详见下方「第二条线」。
+    </p>
 
     <div class="flow">
       <div class="step"><div class="num">1</div><div class="body">
@@ -282,6 +335,84 @@
     </div>
   </section>
 
+  <!-- ============ VOICE GATEWAY LINE ============ -->
+  <section class="wrap">
+    <div class="eyebrow">Voice Gateway · 抽象出独立网关，贴近客户真实链路</div>
+    <h2 class="display">第二条线：IoT 设备如何鉴权接入语音网关</h2>
+    <p class="lead" style="margin-top:.6rem">
+      直接对话线是「人对着浏览器说话」。而客户的真实场景是「设备连上一个语音网关」。我们把语音能力后面隐含的 <strong>voice gateway</strong> 抽象成独立组件：一个真实的 IoT 设备（EC2 常驻进程）向 IoT Core 拿短期票，用<strong>长连接</strong>接入网关；网关验票通过后才发起 Connect 会话。<strong>信令</strong>（鉴权+编排）由网关走 WebSocket，<strong>媒体</strong>（音频）由网页代表设备麦克风直连 Connect——两者分离，是 WebRTC 的标准做法。
+    </p>
+    <div class="diagram" style="margin-top:1rem">
+      <svg viewBox="0 0 960 320" xmlns="http://www.w3.org/2000/svg" font-family="IBM Plex Mono, monospace" font-size="13">
+        <defs>
+          <marker id="ah" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto">
+            <path d="M0,0 L8,3 L0,6 Z" fill="#0a7d7d"/>
+          </marker>
+          <marker id="ao" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto">
+            <path d="M0,0 L8,3 L0,6 Z" fill="#ec7211"/>
+          </marker>
+        </defs>
+
+        <!-- device (EC2) -->
+        <rect x="24" y="120" width="150" height="80" rx="10" fill="#fff" stroke="#e6e1d6"/>
+        <text x="99" y="150" text-anchor="middle" font-weight="600" fill="#232f3e">IoT 设备</text>
+        <text x="99" y="170" text-anchor="middle" fill="#6b7686">EC2 常驻进程</text>
+        <text x="99" y="187" text-anchor="middle" fill="#6b7686">speaker-001</text>
+
+        <!-- IoT Core (ticket issuer) -->
+        <rect x="24" y="20" width="150" height="60" rx="10" fill="#f3f0e9" stroke="#e6e1d6"/>
+        <text x="99" y="45" text-anchor="middle" font-weight="600" fill="#232f3e">IoT Core（发票）</text>
+        <text x="99" y="64" text-anchor="middle" fill="#6b7686">短期票 Mode A</text>
+
+        <!-- voice gateway -->
+        <rect x="360" y="110" width="200" height="100" rx="10" fill="#fff" stroke="#0a7d7d" stroke-width="1.5"/>
+        <text x="460" y="140" text-anchor="middle" font-weight="600" fill="#0a7d7d">voice gateway</text>
+        <text x="460" y="160" text-anchor="middle" fill="#6b7686">API GW WebSocket</text>
+        <text x="460" y="177" text-anchor="middle" fill="#6b7686">+ Lambda（验票）</text>
+        <text x="460" y="194" text-anchor="middle" fill="#6b7686">StartWebRTCContact</text>
+
+        <!-- Connect -->
+        <rect x="760" y="110" width="176" height="100" rx="10" fill="#fff" stroke="#e6e1d6"/>
+        <text x="848" y="145" text-anchor="middle" font-weight="600" fill="#232f3e">Amazon Connect</text>
+        <text x="848" y="165" text-anchor="middle" fill="#6b7686">agentic voice</text>
+        <text x="848" y="182" text-anchor="middle" fill="#6b7686">+ AI agent + 工具</text>
+
+        <!-- observer webpage -->
+        <rect x="360" y="250" width="200" height="56" rx="10" fill="#fff4e0" stroke="#f3d6a4"/>
+        <text x="460" y="274" text-anchor="middle" font-weight="600" fill="#ec7211">观测网页</text>
+        <text x="460" y="292" text-anchor="middle" fill="#6b7686">= 设备麦克风 / 屏幕</text>
+
+        <!-- device -> IoT core (get ticket) -->
+        <path d="M99,120 L99,82" fill="none" stroke="#0a7d7d" stroke-width="1.5" marker-end="url(#ah)"/>
+        <text x="108" y="104" fill="#0a7d7d">①拿票</text>
+
+        <!-- device -> gateway (ws, signaling) -->
+        <path d="M174,160 L358,160" fill="none" stroke="#0a7d7d" stroke-width="1.5" marker-end="url(#ah)"/>
+        <text x="200" y="152" fill="#0a7d7d">②带票长连接（信令）</text>
+
+        <!-- gateway -> connect (start contact) -->
+        <path d="M560,150 L758,150" fill="none" stroke="#0a7d7d" stroke-width="1.5" marker-end="url(#ah)"/>
+        <text x="588" y="142" fill="#0a7d7d">④验票后起会话</text>
+
+        <!-- gateway -> observer (join info) -->
+        <path d="M460,210 L460,248" fill="none" stroke="#ec7211" stroke-width="1.5" marker-end="url(#ao)"/>
+        <text x="470" y="234" fill="#ec7211">⑤只推加入信息</text>
+
+        <!-- observer -> connect (media) -->
+        <path d="M560,278 C700,278 848,240 848,212" fill="none" stroke="#ec7211" stroke-width="1.5" stroke-dasharray="6 6" class="flow-dash" marker-end="url(#ao)"/>
+        <text x="628" y="272" fill="#ec7211">⑥真实音频（媒体）</text>
+      </svg>
+    </div>
+    <div class="grid grid-3" style="margin-top:1.2rem">
+      <div class="card"><h3>设备 → 网关</h3><p class="muted" style="font-size:.9rem">网关验票（Mode A 本地验，0 次回调 IoT Core）。无票 / 票坏 → 拒连。</p></div>
+      <div class="card"><h3>起会话</h3><p class="muted" style="font-size:.9rem"><code>StartWebRTCContact</code> 只有网关的 IAM 角色能调，且仅在验票通过后调——这堵上了原本开放的 <code>/webcall</code>。</p></div>
+      <div class="card"><h3>媒体不裸奔</h3><p class="muted" style="font-size:.9rem">Connect 返回的 Meeting/Attendee 是一次性会话票，网关只定向推给配对的观测网页，攻击者拿不到就建不了媒体流。</p></div>
+    </div>
+    <div style="margin-top:1.4rem">
+      <a class="btn btn-primary" href="gateway.html">▶ 打开 IoT 设备接入演示</a>
+    </div>
+  </section>
+
   <!-- ============ RESPONSIBILITY TABLE ============ -->
   <section class="wrap">
     <div class="eyebrow">Ownership · 我们写什么 vs Connect 托管什么</div>
@@ -291,9 +422,15 @@
       <tr><td>大脑（推理 + 选工具）</td><td>Connect orchestrator AI agent</td><td>Wisdom AIAgent + AIPrompt（Claude）</td></tr>
       <tr><td>工具执行逻辑</td><td>我们的 Lambda</td><td><code>lambda/tools/</code>（Python，确定性）</td></tr>
       <tr><td>工具暴露为 MCP</td><td>AgentCore Gateway</td><td><code>AWS::BedrockAgentCore::Gateway</code></td></tr>
-      <tr><td>浏览器语音接入</td><td>Connect web calling + Chime SDK</td><td><code>lambda/webcall/</code> + <code>web/</code></td></tr>
+      <tr><td>浏览器语音接入（①线）</td><td>Connect web calling + Chime SDK</td><td><code>lambda/webcall/</code> + <code>web/</code></td></tr>
       <tr><td>公网入口（合规）</td><td>CloudFront → S3(OAC) + API Gateway</td><td>不暴露任何 Lambda Function URL</td></tr>
       <tr><td>对话字幕</td><td>AI agent 日志 → 前端轮询</td><td>EVENT_LOGS + <code>/transcript</code></td></tr>
+      <tr><td colspan="3" style="background:#eaf6ee;font-weight:600;color:#1f8a4c">② IoT 设备接入线（<code>-c enableGateway</code>）</td></tr>
+      <tr><td>语音网关（信令+编排）</td><td>我们的 WebSocket Lambda</td><td><code>AWS::ApiGatewayV2</code> WebSocket + <code>lambda/gateway/</code></td></tr>
+      <tr><td>设备身份鉴权</td><td>IoT Core 发票 + 网关本地验票</td><td>短期票 Mode A（<code>auth.js</code>，移植自 vgauth）</td></tr>
+      <tr><td>模拟 IoT 设备</td><td>EC2 常驻进程</td><td><code>device/device.js</code>（拿票→WS→起会话）</td></tr>
+      <tr><td>配对 / 连接状态</td><td>DynamoDB</td><td>connections 表（connectionId + deviceId GSI）</td></tr>
+      <tr><td>媒体承载（代设备麦克风）</td><td>观测网页 + Chime SDK</td><td><code>web/gateway.html</code> · 信令/媒体分离</td></tr>
     </table>
     <div style="margin-top:1.6rem; display:flex; gap:.8rem; flex-wrap:wrap">
       <a class="btn btn-primary" href="index.html">▶ 打开实时演示</a>

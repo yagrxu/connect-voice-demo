@@ -24,6 +24,7 @@
       <a href="index.html">演示</a>
       <a href="product.html" class="active">产品介绍</a>
       <a href="architecture.html">架构</a>
+      <a href="gateway.html">IoT 设备接入</a>
       <a href="deployment.html">部署与调优</a>
           <a href="pricing.html">费用估算</a>
     </div>
@@ -33,7 +34,7 @@
     <div class="eyebrow">Product · 方案概述</div>
     <h1 class="display">把语音 AI 助手，<br>建在 Amazon Connect 之上。</h1>
     <p class="lead" style="margin-top:1rem">
-      语音 AI 助手常见做法是用一个 <strong>voice-to-voice 模型</strong>（如 Amazon Nova 2 Sonic）端到端处理语音进、语音出。本方案改用 <strong>Amazon Connect</strong> 的原生 agentic 能力做出同等语音体验：浏览器直接说话，Connect 负责语音识别与合成、AI agent 负责推理与工具调用——以组件化、可托管、可编排的方式实现，而非依赖单一 voice-to-voice 模型。
+      语音 AI 助手常见做法是用一个 <strong>voice-to-voice 模型</strong>（如 Amazon Nova 2 Sonic）端到端处理语音进、语音出。本方案改用 <strong>Amazon Connect</strong> 的原生 agentic 能力做出同等语音体验，并把它抽象成<strong>两条接入线</strong>：①浏览器直接说话；②真实 <strong>IoT 设备</strong>经 <strong>voice gateway</strong> 鉴权接入——贴近客户实际链路。两条线共用同一套 Connect 后端：语音识别与合成、AI agent 推理与工具调用，全部组件化、可托管、可编排。
     </p>
     <div class="flow-strip">
       <span class="node">🎙️ 浏览器语音</span><span class="arrow">→</span>
@@ -41,6 +42,12 @@
       <span class="node">Orchestrator AI agent</span><span class="arrow">→</span>
       <span class="node">MCP 工具</span><span class="arrow">→</span>
       <span class="node">🔊 语音回答</span>
+    </div>
+    <div class="flow-strip" style="margin-top:.7rem">
+      <span class="node" style="border-color:#bfe3cc;background:#eaf6ee">📟 IoT 设备</span><span class="arrow">→</span>
+      <span class="node" style="border-color:#bfe3cc;background:#eaf6ee">IoT Core 短期票</span><span class="arrow">→</span>
+      <span class="node" style="border-color:#bfe3cc;background:#eaf6ee">voice gateway 验票</span><span class="arrow">→</span>
+      <span class="node">同一套 Connect 后端</span>
     </div>
     <div style="margin-top:1.8rem; display:flex; gap:.8rem; flex-wrap:wrap">
       <a class="btn btn-primary" href="index.html">▶ 打开实时演示</a>
@@ -56,14 +63,15 @@
 
   <section class="wrap">
     <div class="eyebrow">Capabilities · 核心能力</div>
-    <h2 class="display">五块拼在一起，就是一个语音 AI</h2>
+    <h2 class="display">拼在一起，就是一个语音 AI</h2>
     <div class="grid grid-3" style="margin-top:1.4rem">
       <div class="card"><div class="ic">🎙️</div><h3>浏览器语音入口</h3><p class="muted">通过 Connect web calling（WebRTC）+ Amazon Chime SDK，网页点一下即可通话，无需电话号码、无需安装客户端。</p></div>
       <div class="card"><div class="ic">🗣️</div><h3>Agentic voice</h3><p class="muted">Connect 托管的富表现力 ASR + TTS，支持自然停顿、打断（barge-in）。采用组件化语音，而非单一 voice-to-voice 模型（如 Nova 2 Sonic）的 speech-to-speech。</p></div>
       <div class="card"><div class="ic">🧠</div><h3>托管的“大脑”</h3><p class="muted">Connect orchestrator AI agent 负责多步推理，自行判断该调哪个工具——无需自建 Bedrock 调用循环。</p></div>
       <div class="card"><div class="ic">🔧</div><h3>MCP 工具</h3><p class="muted">工具逻辑在我们的 Lambda 里，通过 AgentCore Gateway 以 Model Context Protocol 暴露给 AI agent。</p></div>
       <div class="card"><div class="ic">📝</div><h3>可对比的字幕</h3><p class="muted">对话双方文本都从 Connect 的 AI agent 日志实时拉取，让你直接对比“听到的”与“回答的”。</p></div>
-      <div class="card accent"><div class="ic">📦</div><h3>基础设施即代码</h3><p class="muted">工具、Gateway、MCP 注册、JWT 授权、Lex bot、Contact Flow、AI agent 全链路由 CDK 部署；少数 CFN 未覆盖处用 SDK 补齐。</p></div>
+      <div class="card" style="border-top:3px solid #1f8a4c"><div class="ic" style="background:#eaf6ee;color:#1f8a4c">📟</div><h3>IoT 设备接入（第二条线）</h3><p class="muted">把语音能力抽象成独立的 <strong>voice gateway</strong>（API Gateway WebSocket + Lambda）：真实设备向 IoT Core 拿<strong>短期票</strong>，长连接接入，网关本地验票通过后才发起会话。贴近“设备连语音网关”的客户实际场景。<a href="gateway.html">看演示 →</a></p></div>
+      <div class="card accent"><div class="ic">📦</div><h3>基础设施即代码</h3><p class="muted">工具、AgentCore Gateway、MCP 注册、JWT 授权、Lex bot、Contact Flow、AI agent 全链路由 CDK 部署；第二条线的 WebSocket API、EC2 设备、IoT Core Thing、DynamoDB 也一并 CDK 化（<code>-c enableGateway</code>）；少数 CFN 未覆盖处用 SDK 补齐。</p></div>
     </div>
   </section>
 
@@ -77,6 +85,7 @@
       <tr><td>“大脑”</td><td>模型内置对话与工具调用</td><td>Connect <strong>orchestrator AI agent</strong>（托管，多步推理、可编排）</td></tr>
       <tr><td>工具</td><td>随模型的函数调用约定</td><td><strong>MCP</strong>：AgentCore Gateway → Lambda（标准协议、可复用）</td></tr>
       <tr><td>浏览器接入</td><td>自建 WebSocket + 模型双向流</td><td>Connect <strong>web calling</strong>（WebRTC）+ Chime SDK（开箱即用）</td></tr>
+      <tr><td>设备接入</td><td>需自行设计设备鉴权 + 会话编排</td><td>独立 <strong>voice gateway</strong>（WebSocket）：IoT Core 短期票、网关验票后收口 <code>StartWebRTCContact</code>，信令/媒体分离</td></tr>
       <tr><td>运维与治理</td><td>自行承载模型会话与扩缩</td><td>Connect 托管：安全档案、日志、观测、合规入口</td></tr>
     </table>
     <p class="muted" style="margin-top:1rem; font-size:.9rem">

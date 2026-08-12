@@ -38,6 +38,7 @@
       <a href="index.html">演示</a>
       <a href="product.html">产品介绍</a>
       <a href="architecture.html">架构</a>
+      <a href="gateway.html">IoT 设备接入</a>
       <a href="deployment.html">部署与调优</a>
       <a href="pricing.html" class="active">费用估算</a>
     </div>
@@ -69,6 +70,11 @@
           <input type="range" id="tok" min="500" max="40000" step="500" value="4000">
           <div class="hint">AI agent 推理的输入+输出 token（含工具往返）。</div>
         </div>
+        <div class="field">
+          <label>② IoT 设备接入线：常驻设备数 <span class="val" id="vDev">0</span></label>
+          <input type="range" id="dev" min="0" max="50" step="1" value="0">
+          <div class="hint">第二条线（<code>-c enableGateway</code>）：每台设备一个 7×24 常驻 EC2 进程——<strong>固定月成本</strong>，与对话量无关。设 0＝只用浏览器直连线。</div>
+        </div>
 
         <details class="rates">
           <summary>调整单价（示例值，可编辑）</summary>
@@ -77,6 +83,8 @@
           <div class="rate"><span class="nm">Bedrock 模型（AI agent, Claude Haiku 档）</span><input type="number" id="rTok" value="1.20" step="0.05"><span class="unit">$/百万 token</span></div>
           <div class="rate"><span class="nm">其它基础设施（Lambda/APIGW/CF/S3/日志）</span><input type="number" id="rInfra" value="0.0008" step="0.0001"><span class="unit">$/对话</span></div>
           <div class="rate"><span class="nm">固定月成本（CloudFront/日志留存等）</span><input type="number" id="rFixed" value="5" step="1"><span class="unit">$/月</span></div>
+          <div class="rate"><span class="nm">设备主机（EC2 t3.micro, 7×24）</span><input type="number" id="rEc2" value="7.5" step="0.5"><span class="unit">$/台·月</span></div>
+          <div class="rate"><span class="nm">网关基础设施（WebSocket API + DynamoDB）</span><input type="number" id="rGw" value="1.0" step="0.5"><span class="unit">$/台·月</span></div>
         </details>
       </div>
 
@@ -92,13 +100,14 @@
           <tr><td>Bedrock 模型（AI agent）</td><td>$<span id="cTok">0</span></td></tr>
           <tr><td>其它基础设施</td><td>$<span id="cInfra">0</span></td></tr>
           <tr><td>固定月成本</td><td>$<span id="cFixed">0</span></td></tr>
+          <tr><td>IoT 设备线（EC2+网关，常驻）</td><td>$<span id="cDev">0</span></td></tr>
           <tr><td>合计</td><td>$<span id="cTotal">0</span></td></tr>
         </table>
       </div>
     </div>
 
     <div class="disclaimer">
-      ⚠️ <strong>免责声明</strong>：本估算器仅用于量级参考。实际费用取决于 AWS 区域、具体计费模式（如 Connect 按对话/按分钟、Bedrock 输入与输出 token 分别计价、跨区域推理配置等）、承诺折扣与免费额度。请以 AWS 官方定价页与实际账单为准。
+      ⚠️ <strong>免责声明</strong>：本估算器仅用于量级参考。实际费用取决于 AWS 区域、具体计费模式（如 Connect 按对话/按分钟、Bedrock 输入与输出 token 分别计价、跨区域推理配置等）、承诺折扣与免费额度。第二条线的 EC2 设备主机是 <strong>7×24 固定成本</strong>（与对话量无关），WebSocket API 与 DynamoDB 按用量计费、量级很小，这里合并为“每台·月”近似；不启用第二条线（<code>-c enableGateway</code>）则此项为 0。请以 AWS 官方定价页与实际账单为准。
     </div>
     <div style="margin-top:1.4rem; display:flex; gap:.8rem; flex-wrap:wrap">
       <a class="btn btn-primary" href="index.html">▶ 打开实时演示</a>
@@ -111,18 +120,21 @@
   <script>
     const $ = id => document.getElementById(id);
     const fmt = (n, d=2) => n.toLocaleString('en-US', {minimumFractionDigits:d, maximumFractionDigits:d});
-    const colors = ['#0a7d7d','#3b9c9c','#ff9900','#ec7211','#c4bdae'];
+    const colors = ['#0a7d7d','#3b9c9c','#ff9900','#ec7211','#c4bdae','#1f8a4c'];
 
     function calc() {
       const conv = +$('conv').value;
       const mins = +$('mins').value;
       const tok  = +$('tok').value;
+      const dev  = +$('dev').value;
       $('vConv').textContent = conv.toLocaleString();
       $('vMin').textContent = mins.toFixed(1) + ' 分钟';
       $('vTok').textContent = tok.toLocaleString();
+      $('vDev').textContent = dev.toLocaleString();
 
       const rVoice = +$('rVoice').value, rChime = +$('rChime').value,
-            rTok = +$('rTok').value, rInfra = +$('rInfra').value, rFixed = +$('rFixed').value;
+            rTok = +$('rTok').value, rInfra = +$('rInfra').value, rFixed = +$('rFixed').value,
+            rEc2 = +$('rEc2').value, rGw = +$('rGw').value;
 
       const totalMin = conv * mins;
       const cVoice = totalMin * rVoice;
@@ -130,18 +142,20 @@
       const cTok   = conv * tok / 1e6 * rTok;
       const cInfra = conv * rInfra;
       const cFixed = rFixed;
-      const total  = cVoice + cChime + cTok + cInfra + cFixed;
+      const cDev   = dev * (rEc2 + rGw); // 7×24 常驻，与对话量无关
+      const total  = cVoice + cChime + cTok + cInfra + cFixed + cDev;
 
       $('cVoice').textContent = fmt(cVoice);
       $('cChime').textContent = fmt(cChime);
       $('cTok').textContent   = fmt(cTok);
       $('cInfra').textContent = fmt(cInfra);
       $('cFixed').textContent = fmt(cFixed);
+      $('cDev').textContent   = fmt(cDev);
       $('cTotal').textContent = fmt(total);
       $('grand').textContent  = fmt(total, total < 1000 ? 2 : 0);
       $('perConv').textContent = fmt(conv ? total / conv : 0, 4);
 
-      const parts = [cVoice, cChime, cTok, cInfra, cFixed];
+      const parts = [cVoice, cChime, cTok, cInfra, cFixed, cDev];
       $('bar').innerHTML = parts.map((p,i) =>
         `<span style="width:${total? (p/total*100):0}%;background:${colors[i]}"></span>`).join('');
     }

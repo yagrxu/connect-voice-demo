@@ -9,12 +9,26 @@
 // the WebRTC voice call with the Amazon Chime SDK for JavaScript. No phone
 // number is involved — this replaces the Nova Sonic browser mic experience.
 
+const crypto = require('crypto');
 const { ConnectClient, StartWebRTCContactCommand } = require('@aws-sdk/client-connect');
 const { CloudWatchLogsClient, FilterLogEventsCommand } = require('@aws-sdk/client-cloudwatch-logs');
 
 const INSTANCE_ID = process.env.CONNECT_INSTANCE_ID || '';
 const CONTACT_FLOW_ID = process.env.CONTACT_FLOW_ID || '';
 const AI_LOG_GROUP = process.env.AI_LOG_GROUP || '';
+const WS_URL = process.env.WS_URL || ''; // voice-gateway WebSocket URL (observer page needs it)
+const TOKEN_SECRET = process.env.TOKEN_SECRET || ''; // set only when the gateway line is enabled
+
+// Mint the Mode-A device ticket ("device gets a ticket from IoT Core"). Kept
+// byte-identical to lambda/gateway/auth.js::signToken so the gateway verifies
+// it. Inlined here (not require()'d) because this Lambda's asset packages only
+// lambda/webcall/. See lambda/gateway/auth.js for the canonical copy + rationale.
+function signToken(deviceId) {
+  const payload = { sub: deviceId, scope: 'voice-stream', iss: 'iot-core-demo', iat: 1700000000, exp: 1700003600 };
+  const body = Buffer.from(JSON.stringify(payload)).toString('base64url');
+  const sig = crypto.createHmac('sha256', TOKEN_SECRET).update(body).digest('base64url');
+  return `${body}.${sig}`;
+}
 
 const connectClient = new ConnectClient({});
 const logsClient = new CloudWatchLogsClient({});
@@ -150,6 +164,27 @@ exports.handler = async (event) => {
     if (method === 'GET' && p.endsWith('/transcript')) {
       const since = event?.queryStringParameters?.since;
       return await getTranscript(since);
+    }
+    // Voice-gateway line (only meaningful when enableGateway deployed the WS API):
+    //   POST /issue-ticket  -> device "gets a ticket from IoT Core" (Mode A).
+    //   GET  /gw-config      -> observer page learns the WebSocket URL.
+    if (method === 'POST' && p.endsWith('/issue-ticket')) {
+      if (!TOKEN_SECRET) return json(503, { error: 'gateway line not enabled (no TOKEN_SECRET)' });
+      let deviceId = 'speaker-001';
+      try {
+        const body = event.body ? JSON.parse(event.body) : {};
+        if (body.deviceId) deviceId = body.deviceId;
+      } catch (_) { /* default */ }
+      return json(200, {
+        token: signToken(deviceId),
+        steps: [
+          'device authenticates to IoT Core with cert (mTLS)',
+          'IoT Core issues short-lived, self-verifiable ticket (scope=voice-stream)',
+        ],
+      });
+    }
+    if (method === 'GET' && p.endsWith('/gw-config')) {
+      return json(200, { wsUrl: WS_URL, deviceId: 'speaker-001' });
     }
     return json(404, { error: 'Not found', path: resourcePath, method });
   } catch (err) {

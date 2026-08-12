@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Connect 语音 AI 演示 · IoT 设备接入</title>
+    <link rel="stylesheet" href="site.css">
+    <style>
+        /* Element IDs consumed by gateway.js — do not rename:
+           connectBtn joinBtn stopBtn wsState devState phase transcript log
+           steps pairId */
+        .gw-hero { padding: 3rem 0 1rem; }
+        .gw-panel { display: grid; grid-template-columns: .95fr 1.05fr; gap: 1.25rem; align-items: start; margin-top: 1.5rem; }
+        @media (max-width: 940px) { .gw-panel { grid-template-columns: 1fr; } }
+        .console { background: var(--card); border: 1px solid var(--line); border-radius: var(--radius);
+            box-shadow: var(--shadow-lg); padding: 1.4rem; display: flex; flex-direction: column; gap: 1rem; }
+        .controls { display: flex; gap: .8rem; align-items: center; flex-wrap: wrap; }
+        .status { display: flex; align-items: center; gap: .5rem; font-size: .84rem; color: var(--muted); }
+        .status.ml { margin-left: auto; }
+        .dot { width: 10px; height: 10px; border-radius: 50%; background: #c4bdae; transition: background .2s; }
+        .dot.on { background: var(--good); }
+        .dot.wait { background: var(--orange); animation: pulse 1.2s ease-in-out infinite; }
+        .dot.off { background: #d64545; }
+        .phase { min-height: 3.2rem; display: flex; align-items: center; justify-content: center;
+            font-size: 1.2rem; font-weight: 600; border-radius: 12px; background: var(--paper-2);
+            color: var(--muted); transition: all .25s; border: 1px solid var(--line); }
+        .phase.connecting { background: #fff4e0; color: var(--orange-deep); border-color:#f3d6a4; animation: pulse 1.2s ease-in-out infinite; }
+        .phase.listening { background: #eaf6ee; color: var(--good); border-color:#bfe3cc; }
+        .phase.thinking  { background: #fbeede; color: var(--warn); border-color:#f0d3a8; animation: pulse 1s ease-in-out infinite; }
+        .phase.speaking  { background: var(--teal-soft); color: var(--teal); border-color:#b6ddda; }
+        @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: .55; } }
+        #transcript { background: var(--paper); border: 1px solid var(--line); border-radius: 12px;
+            padding: .85rem 1rem; min-height: 6rem; max-height: 36vh; overflow-y: auto;
+            display: flex; flex-direction: column; gap: .55rem; }
+        #transcript:empty::before { content: "对话字幕会显示在这里（取自 Connect 日志）"; color: var(--muted); font-size: .85rem; }
+        .turn { display: flex; gap: .6rem; font-size: .95rem; line-height: 1.45; }
+        .turn .who { flex: 0 0 4.8rem; font-weight: 700; font-family: var(--mono); font-size: .8rem; padding-top: .1rem; }
+        .turn.you .who { color: var(--good); }
+        .turn.bot .who { color: var(--teal); }
+        #log { font-family: var(--mono); font-size: .74rem; color: var(--muted); background: var(--paper);
+            border: 1px dashed var(--line); border-radius: 10px; padding: .7rem .9rem; white-space: pre-wrap;
+            word-break: break-word; max-height: 20vh; overflow-y: auto; }
+        /* Signaling steps ledger */
+        #steps { list-style: none; display: flex; flex-direction: column; gap: .5rem; }
+        #steps li { display: flex; gap: .55rem; align-items: baseline; font-size: .9rem; color: var(--ink-2); }
+        #steps li .n { flex: 0 0 1.4rem; height: 1.4rem; border-radius: 50%; background: var(--paper-2);
+            color: var(--muted); font-family: var(--mono); font-size: .74rem; display: grid; place-items: center; }
+        #steps li.done .n { background: var(--good); color: #fff; }
+        #steps li.done { color: var(--ink); }
+        .pairbox { font-family: var(--mono); font-size: .8rem; background: var(--ink); color: #fff;
+            padding: .2rem .55rem; border-radius: 6px; }
+        .role-legend { display:flex; gap:.5rem; flex-wrap:wrap; margin-top:.4rem }
+    </style>
+</head>
+<body>
+    <nav class="nav">
+      <div class="nav-inner">
+        <a class="brand" href="index.html"><span class="spark">◆</span> Connect 语音 AI</a>
+        <div class="nav-links">
+          <a href="index.html">演示</a>
+          <a href="product.html">产品介绍</a>
+          <a href="architecture.html">架构</a>
+          <a href="gateway.html" class="active">IoT 设备接入</a>
+          <a href="deployment.html">部署与调优</a>
+          <a href="pricing.html">费用估算</a>
+        </div>
+      </div>
+    </nav>
+
+    <div class="wrap gw-hero reveal">
+      <div class="eyebrow">Voice Gateway · IoT 设备接入</div>
+      <h1 class="display">一个注册的 IoT 设备，<br>如何鉴权接入语音网关。</h1>
+      <p class="lead" style="margin-top:1rem">
+        这条线把语音能力抽象成一个独立的 <strong>voice gateway</strong>：真实的 IoT 设备（EC2 上常驻的 <span class="mono">speaker-001</span> 进程）先向 IoT Core 拿一张短期票，再用长连接接入网关；网关验票通过后才发起 Connect 语音会话。本页是<strong>观测台</strong>——它按同一个配对码连上网关，展示设备与网关之间发生的每一步，并作为设备的“麦克风/扬声器”承载真实音频。
+      </p>
+
+      <div class="gw-panel">
+        <!-- Left: signaling ledger + topology -->
+        <div class="card">
+          <h3>信令过程（设备 ↔ 网关）</h3>
+          <div class="role-legend">
+            <span class="pill">配对码 <span class="pairbox" id="pairId">speaker-001</span></span>
+            <span class="status"><span class="dot" id="devState"></span><span>设备</span></span>
+            <span class="status"><span class="dot" id="wsState"></span><span>观测连接</span></span>
+          </div>
+          <ol id="steps" style="margin-top:1rem">
+            <li data-step="observer"><span class="n">1</span><span>观测台连上网关（role=observer，无需设备票）</span></li>
+            <li data-step="device-online"><span class="n">2</span><span>设备上线：向 IoT Core 拿票后长连接接入</span></li>
+            <li data-step="auth"><span class="n">3</span><span>网关验票（本地验证，0 次回调 IoT Core）</span></li>
+            <li data-step="session"><span class="n">4</span><span>设备请求会话 → 网关 StartWebRTCContact</span></li>
+            <li data-step="join"><span class="n">5</span><span>网关把 Chime 加入信息只推给本观测台</span></li>
+            <li data-step="media"><span class="n">6</span><span>观测台用麦克风建立媒体流，直连 Connect</span></li>
+          </ol>
+          <p class="muted" style="font-size:.82rem;margin-top:.9rem">
+            设备与网页是<strong>两个独立进程</strong>，只靠配对码在网关处会合。设备不碰音频，网页不碰鉴权——这就是信令/媒体分离。
+          </p>
+        </div>
+
+        <!-- Right: observer console -->
+        <div class="console">
+          <div class="controls">
+            <label for="lang" style="font-size:.85rem;color:var(--muted);display:flex;align-items:center;gap:.4rem">
+              语言
+              <select id="lang" style="font-family:var(--sans);font-size:.9rem;padding:.45rem .6rem;border:1px solid var(--line);border-radius:8px;background:var(--paper);color:var(--ink)">
+                <option value="en_US">English</option>
+                <option value="zh_CN">中文（普通话）</option>
+              </select>
+            </label>
+            <button id="connectBtn" class="btn btn-primary">▶ 连接网关（观测）</button>
+            <button id="joinBtn" class="btn btn-primary" disabled>🎙️ 加入音频</button>
+            <button id="stopBtn" class="btn btn-ghost" disabled>■ 结束</button>
+          </div>
+          <div class="phase" id="phase"></div>
+          <div id="transcript"></div>
+          <div id="log"></div>
+          <p class="muted" style="font-size:.82rem">
+            演示顺序：先“连接网关（观测）”，等设备上线并起会话后，“加入音频”按钮亮起，点击即可用麦克风与 AI 对话。允许麦克风权限，建议 Chrome / Edge / Firefox。
+          </p>
+        </div>
+      </div>
+    </div>
+
+    <div class="footer">
+      <div class="wrap">Amazon Connect 语音 AI 演示 · voice gateway 抽象 · 沙箱环境 · 仅供方案演示</div>
+    </div>
+
+    <script type="module" src="gateway.js"></script>
+</body>
+</html>

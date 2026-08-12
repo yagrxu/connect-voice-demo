@@ -1,0 +1,11 @@
+{
+  "name": "connect-voice-demo-device",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Simulated IoT device (speaker-001) that connects to the voice gateway. Runs on EC2. Zero dependencies — uses Node 22 global fetch + WebSocket.",
+  "type": "commonjs",
+  "engines": { "node": ">=22" },
+  "scripts": {
+    "start": "node device.js"
+  }
+}
