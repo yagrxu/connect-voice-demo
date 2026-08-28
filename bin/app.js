@@ -3,6 +3,7 @@
 const cdk = require('aws-cdk-lib');
 const { ConnectVoiceDemoStack } = require('../lib/connect-demo-stack');
 const { CertStack } = require('../lib/cert-stack');
+const { StreamingStack } = require('../lib/streaming-stack');
 
 const app = new cdk.App();
 
@@ -40,3 +41,15 @@ new ConnectVoiceDemoStack(app, 'ConnectVoiceDemoStack', {
   description:
     'Browser voice-AI demo on Amazon Connect: web calling (WebRTC) -> agentic voice -> orchestrator AI agent -> MCP tools (get_current_time, get_weather). A Nova Sonic replacement.',
 });
+
+// 方案 B — self-hosted streaming pipeline (Fargate-direct). Opt-in and fully
+// separate from the Connect stack. Needs Docker at deploy time to build the image.
+//   npx cdk deploy ConnectVoiceDemoStreamingStack -c enableStreaming=true
+if (app.node.tryGetContext('enableStreaming')) {
+  new StreamingStack(app, 'ConnectVoiceDemoStreamingStack', {
+    env: { account, region },
+    zoneName,
+    hostedZoneId,
+    description: '方案 B streaming pipeline: Fargate (Transcribe+Bedrock+Polly) + ALB WSS + DynamoDB timings.',
+  });
+}

@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>架构 · Connect 语音 AI</title>
+  <title>架构 · 语音 AI 演示</title>
   <link rel="stylesheet" href="site.css">
   <style>
     .legend { display:flex; gap:1.2rem; flex-wrap:wrap; margin:.8rem 0 1.2rem; font-size:.85rem; color:var(--ink-2); }
@@ -21,12 +21,27 @@
     .step .t { font-weight:700; }
     .step .who { font-family:var(--mono); font-size:.72rem; letter-spacing:.08em; text-transform:uppercase; }
     .who.you { color: var(--good); } .who.cf { color: var(--orange-deep); } .who.connect { color: var(--teal); } .who.ai { color: #6d4bd8; }
+    .who.fg { color: var(--teal); } .who.aws { color: #6d4bd8; }
     .step p { color: var(--ink-2); font-size:.92rem; margin-top:.25rem; }
+    /* implementation selector (tabs) — show one pipeline's detail at a time */
+    .impl-tabs { display:flex; gap:.5rem; flex-wrap:wrap; margin:1.6rem 0 .4rem; }
+    .impl-tab { font:inherit; font-weight:600; font-size:.9rem; padding:.55rem 1.05rem; border:1px solid var(--line);
+      border-radius:10px; background:var(--card); color:var(--ink-2); cursor:pointer; box-shadow:var(--shadow); transition:all .15s; }
+    .impl-tab:hover { border-color:var(--orange); color:var(--ink); }
+    .impl-tab.active { background:var(--ink); color:#fff; border-color:var(--ink); }
+    .impl-tab .tag { font-family:var(--mono); font-size:.7rem; opacity:.7; margin-left:.35rem; }
+    .impl-hint { font-size:.83rem; color:var(--muted); margin:.2rem 0 .4rem; }
+    [data-impl-panel] { display:none; }
+    [data-impl-panel].active { display:block; }
+    /* B/C shared streaming diagram: highlight the selected pipeline, dim the other */
+    #bcArch .pipe-b, #bcArch .pipe-c { transition: opacity .2s ease; }
+    #bcArch[data-active="nova"] .pipe-b { opacity:.16; }
+    #bcArch[data-active="transcribe"] .pipe-c { opacity:.16; }
   </style>
 </head>
 <body>
   <nav class="nav"><div class="nav-inner">
-    <a class="brand" href="index.html"><span class="spark">◆</span> Connect 语音 AI</a>
+    <a class="brand" href="index.html"><span class="spark">◆</span> 语音 AI 演示</a>
     <div class="nav-links">
       <a href="index.html">演示</a>
       <a href="product.html">产品介绍</a>
@@ -53,8 +68,45 @@
     </div>
   </div>
 
-  <!-- ============ OVERVIEW SVG ============ -->
-  <div class="wrap">
+  <!-- ============ THREE PIPELINES · 方案对比（始终可见） ============ -->
+  <section class="wrap">
+    <div class="eyebrow">Pipelines · 三种技术实现对比</div>
+    <h2 class="display">同一个演示页，三种可切换、可对比的技术实现</h2>
+    <p class="lead" style="margin-top:.6rem">
+      演示页顶部的「方案」下拉可切换三种实现，共用同一套前端与延迟面板做横向对比。<strong>方案 A（Connect）</strong>是托管组件化路线；<strong>方案 B（Transcribe）</strong>是自控三段流式（可精确计时）；<strong>方案 C（Nova Sonic）</strong>是端到端语音（最低延迟）。此对比表始终可见，下方按<strong>方案切换</strong>看各自的架构与数据流。
+    </p>
+    <table class="tbl" style="margin-top:1rem">
+      <tr>
+        <th style="width:16%">维度</th>
+        <th style="width:28%">方案 A · Connect</th>
+        <th style="width:28%">方案 B · Transcribe</th>
+        <th style="width:28%">方案 C · Nova Sonic</th>
+      </tr>
+      <tr><td>定位</td><td>托管 agentic voice</td><td>自控三段流式管线</td><td>端到端语音（S2S）</td></tr>
+      <tr><td>ASR</td><td>Connect agentic voice（托管黑盒）</td><td>Amazon Transcribe 流式</td><td>Nova 2 Sonic 内置</td></tr>
+      <tr><td>推理（LLM）</td><td>Q in Connect orchestrator（Claude）</td><td>Bedrock Converse（Claude Haiku，可换）</td><td>Nova 2 Sonic 内置</td></tr>
+      <tr><td>TTS</td><td>agentic voice（Matthew）</td><td>Amazon Polly（neural）</td><td>Nova 2 Sonic 内置</td></tr>
+      <tr><td>分段计时</td><td>不可（黑盒，仅 ≈ 估算，滞后数秒）</td><td><strong>可精确</strong>切分 ASR / LLM / TTS</td><td>不可切分，仅端到端总延迟</td></tr>
+      <tr><td>端到端延迟</td><td>≈ 3–4 s</td><td>≈ 2.3 s（LLM 主导）</td><td><strong>≈ 1.4 s</strong></td></tr>
+      <tr><td>计时锚点</td><td colspan="3">三者统一：从「说完话」（VAD/回合结束）计到首个回复音频——不含说话时长，可公平对比</td></tr>
+      <tr><td>设备接入（IoT）</td><td>voice gateway：信令/媒体分离（WebRTC 所迫），<strong>已实现 + 演示</strong></td><td colspan="2"><strong>更简单</strong>：设备带票直连 WSS 推 PCM，无信令/媒体分离；本演示以文档说明，未单独实现（主演示页的浏览器麦克风已等价演示其数据路径）</td></tr>
+      <tr><td>部署形态</td><td>Connect 实例 + Q in Connect</td><td>ECS Fargate（ARM64）+ ALB WSS</td><td>同 B，<em>独立服务/镜像</em>（awscrt 版本冲突）</td></tr>
+      <tr><td>适用</td><td>需要 Connect 生态 / 电话 / 坐席</td><td>需要逐段调试、比较/更换模型</td><td>追求最低延迟的自然语音对话</td></tr>
+    </table>
+  </section>
+
+  <!-- implementation selector -->
+  <div class="wrap" style="padding-top:0">
+    <div class="impl-tabs" role="tablist">
+      <button class="impl-tab active" data-impl="connect">Connect<span class="tag">方案 A</span></button>
+      <button class="impl-tab" data-impl="transcribe">Transcribe<span class="tag">方案 B</span></button>
+      <button class="impl-tab" data-impl="nova">Nova Sonic<span class="tag">方案 C</span></button>
+    </div>
+    <p class="impl-hint" id="implHint">下面展示 <b>方案 A（Connect）</b> 的总览、数据形态、场景数据流与 IoT 设备接入。上方对比表始终可见。</p>
+  </div>
+
+  <!-- ============ OVERVIEW SVG（方案 A · Connect） ============ -->
+  <div class="wrap" data-impl-panel="connect">
     <div class="diagram">
       <svg viewBox="0 0 980 640" role="img" aria-label="架构总览图">
         <defs>
@@ -196,9 +248,247 @@
     </p>
   </div>
 
+  <!-- ============ 方案 B/C STREAMING ARCHITECTURE (shared) ============ -->
+  <section class="wrap" data-impl-panel="transcribe nova">
+    <div class="eyebrow">方案 B / C · 自控流式架构（共用基础设施）</div>
+    <h2 class="display">前端 → 中间 → 后端：自控管线怎么搭</h2>
+    <p class="lead" style="margin-top:.6rem">
+      方案 B（Transcribe）与方案 C（Nova Sonic）不经 Connect，<strong>共用同一套流式基础设施</strong>：<strong>前端</strong>浏览器用 AudioWorklet 采集 16k PCM、经 WebSocket 上行；<strong>中间</strong>静态站走 CloudFront/S3，实时流走 ALB（WSS，按<strong>路径</strong>路由 <code>/ws/session</code> → B、<code>/ws/nova</code> → C）；<strong>后端</strong>是两个 ECS Fargate 服务（Graviton/ARM64），分别调用 AWS 托管 AI 服务，并把每回合时间戳写入 DynamoDB 供延迟面板读取。下图同时画出 B 与 C 两条后端，<strong>切换上方「方案」标签会高亮当前所选管线、淡出另一条</strong>（当前所选：方案 B / C 各自的 Fargate 服务与其调用的 AWS 服务）。
+    </p>
+
+    <div class="diagram" style="margin-top:1rem">
+      <svg id="bcArch" viewBox="0 0 980 560" role="img" aria-label="方案 B / C 自控流式架构图">
+        <defs>
+          <marker id="bAud" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#0a7d7d"/></marker>
+          <marker id="bTxt" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#ec7211"/></marker>
+          <marker id="bDyn" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#8a8f98"/></marker>
+          <style>
+            .bl{font-family:'IBM Plex Sans','IBM Plex Sans SC',sans-serif;font-weight:600;font-size:13px;fill:#232f3e;}
+            .bs{font-family:'IBM Plex Mono',monospace;font-size:9.5px;fill:#6b7686;}
+            .bcol{font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.12em;fill:#6b7686;text-transform:uppercase;}
+            .baud{stroke:#0a7d7d;stroke-width:2.5;fill:none;}
+            .btxt{stroke:#ec7211;stroke-width:2.5;fill:none;}
+            .bdyn{stroke:#8a8f98;stroke-width:2;fill:none;stroke-dasharray:6 5;}
+            .bfmt{font-family:'IBM Plex Mono',monospace;font-size:9.5px;}
+          </style>
+        </defs>
+
+          <!-- column labels -->
+          <text class="bcol" x="20"  y="34">前端 · 浏览器</text>
+          <text class="bcol" x="250" y="34">中间 · 边缘 / 入口</text>
+          <text class="bcol" x="470" y="34">后端 · ECS Fargate（ARM64）</text>
+          <text class="bcol" x="730" y="34">AWS 托管 AI 服务</text>
+
+          <!-- Browser (frontend) -->
+          <rect x="20" y="210" width="190" height="150" rx="12" fill="#eef4fb" stroke="#cfe0f2"/>
+          <text class="bl" x="34" y="238">🎙️ 浏览器</text>
+          <text class="bs" x="34" y="260">AudioWorklet 采集 → 16k PCM</text>
+          <text class="bs" x="34" y="278">批量 512 样本 · WebSocket 上行</text>
+          <text class="bs" x="34" y="296">播放 24k/16k PCM · 半双工静音</text>
+          <text class="bs" x="34" y="314">延迟面板：总延迟 / 分段</text>
+          <text class="bs" x="34" y="332">stream.js · app.js</text>
+
+          <!-- CloudFront static (middle top) -->
+          <rect x="250" y="70" width="190" height="80" rx="12" fill="#fff4e0" stroke="#f3d6a4"/>
+          <text class="bl" x="264" y="98">CloudFront + S3（OAC）</text>
+          <text class="bs" x="264" y="118">静态站：index / app.js</text>
+          <text class="bs" x="264" y="134">stream.js（同 Connect 页复用）</text>
+
+          <!-- ALB (middle) -->
+          <rect x="250" y="240" width="190" height="120" rx="12" fill="#e2f1f0" stroke="#b6ddda"/>
+          <text class="bl" x="264" y="268">Application Load Balancer</text>
+          <text class="bs" x="264" y="288">WSS · stream.yagr-demo.cloud</text>
+          <text class="bs" x="264" y="306">ACM 证书 · 长连接空闲 1h</text>
+          <text class="bs" x="264" y="326">按路径路由：</text>
+          <text class="bs" x="264" y="342">/ws/session  ·  /ws/nova</text>
+
+          <!-- Fargate service 1: Transcribe pipeline -->
+          <g class="pipe-b">
+          <rect x="470" y="140" width="230" height="112" rx="12" fill="#fff" stroke="#0a7d7d"/>
+          <text class="bl" x="484" y="166">Fargate 服务① · Transcribe 管线</text>
+          <text class="bs" x="484" y="186">uvicorn · /ws/session</text>
+          <text class="bs" x="484" y="202">webrtcvad 端点检测（说完话）</text>
+          <text class="bs" x="484" y="218">串起 ASR→LLM→TTS 三段</text>
+          <text class="bs" x="484" y="234">写精确三段时间戳</text>
+          </g>
+
+          <!-- Fargate service 2: Nova Sonic -->
+          <g class="pipe-c">
+          <rect x="470" y="322" width="230" height="112" rx="12" fill="#fff" stroke="#6d4bd8"/>
+          <text class="bl" x="484" y="348">Fargate 服务② · Nova Sonic</text>
+          <text class="bs" x="484" y="368">uvicorn · /ws/nova</text>
+          <text class="bs" x="484" y="384">双向流 S2S（音频进 / 音频出）</text>
+          <text class="bs" x="484" y="400">Nova 内置端点/回合判定</text>
+          <text class="bs" x="484" y="416">独立镜像（awscrt 版本隔离）</text>
+          </g>
+
+          <!-- AWS services for pipeline 1 (stacked) -->
+          <g class="pipe-b">
+          <rect x="730" y="112" width="230" height="46" rx="10" fill="#e2f1f0" stroke="#b6ddda"/>
+          <text class="bl" x="744" y="132" font-size="12">Amazon Transcribe</text>
+          <text class="bs" x="744" y="149">流式 ASR（16k PCM → 文字）</text>
+          <rect x="730" y="166" width="230" height="46" rx="10" fill="#efe9fb" stroke="#d6c8f2"/>
+          <text class="bl" x="744" y="186" font-size="12">Amazon Bedrock · Claude Haiku</text>
+          <text class="bs" x="744" y="203">Converse 流式 + 工具调用（可换模型）</text>
+          <rect x="730" y="220" width="230" height="46" rx="10" fill="#e2f1f0" stroke="#b6ddda"/>
+          <text class="bl" x="744" y="240" font-size="12">Amazon Polly（neural TTS）</text>
+          <text class="bs" x="744" y="257">文字 → PCM 音频（流式首字节计时）</text>
+          </g>
+
+          <!-- AWS service for pipeline 2 -->
+          <g class="pipe-c">
+          <rect x="730" y="336" width="230" height="66" rx="10" fill="#efe9fb" stroke="#d6c8f2"/>
+          <text class="bl" x="744" y="360" font-size="12">Amazon Bedrock · Nova 2 Sonic</text>
+          <text class="bs" x="744" y="378">端到端语音（S2S）</text>
+          <text class="bs" x="744" y="393">InvokeModelWithBidirectionalStream</text>
+          </g>
+
+          <!-- DynamoDB -->
+          <rect x="470" y="472" width="230" height="60" rx="10" fill="#fff4e0" stroke="#f3d6a4"/>
+          <text class="bl" x="484" y="498">DynamoDB · turn-timings</text>
+          <text class="bs" x="484" y="518">每回合时间戳（ASR/LLM/TTS/E2E）→ 面板</text>
+
+          <!-- edges -->
+          <!-- browser -> cloudfront (static, HTTPS) -->
+          <path class="btxt" d="M150,210 C170,160 210,120 246,118" marker-end="url(#bTxt)"/>
+          <text class="bfmt" x="150" y="150" fill="#ec7211">静态资源 HTTPS</text>
+          <!-- browser <-> ALB (WSS bidirectional) -->
+          <path class="baud" d="M210,278 L246,278" marker-end="url(#bAud)"/>
+          <text class="bfmt" x="150" y="270" fill="#0a7d7d">上行 16k PCM</text>
+          <path class="baud" d="M246,320 L210,320" marker-end="url(#bAud)"/>
+          <text class="bfmt" x="150" y="336" fill="#0a7d7d">下行 合成/回复音频</text>
+          <!-- ALB -> Fargate1 (/ws/session) -->
+          <g class="pipe-b">
+          <path class="baud" d="M440,270 L466,210" marker-end="url(#bAud)"/>
+          <text class="bfmt" x="378" y="212" fill="#0a7d7d">/ws/session</text>
+          </g>
+          <!-- ALB -> Fargate2 (/ws/nova) -->
+          <g class="pipe-c">
+          <path class="baud" d="M440,330 L466,372" marker-end="url(#bAud)"/>
+          <text class="bfmt" x="384" y="360" fill="#0a7d7d">/ws/nova</text>
+          </g>
+          <!-- Fargate1 -> Transcribe / Bedrock / Polly -->
+          <g class="pipe-b">
+          <path class="baud" d="M700,176 L726,140" marker-end="url(#bAud)"/>
+          <text class="bfmt" x="702" y="164" fill="#0a7d7d">音频</text>
+          <path class="btxt" d="M700,196 L726,190" marker-end="url(#bTxt)"/>
+          <text class="bfmt" x="702" y="205" fill="#ec7211">文字</text>
+          <path class="btxt" d="M700,220 L726,240" marker-end="url(#bTxt)"/>
+          <text class="bfmt" x="700" y="235" fill="#ec7211">文字→音频</text>
+          </g>
+          <!-- Fargate2 <-> Nova (bidirectional) -->
+          <g class="pipe-c">
+          <path class="baud" d="M700,372 L726,370" marker-end="url(#bAud)"/>
+          <path class="baud" d="M726,388 L700,388" marker-end="url(#bAud)"/>
+          <text class="bfmt" x="702" y="410" fill="#0a7d7d">双向 PCM</text>
+          </g>
+          <!-- Fargate2 -> DynamoDB (timings) -->
+          <g class="pipe-c">
+          <path class="bdyn" d="M585,434 L585,470" marker-end="url(#bDyn)"/>
+          </g>
+          <!-- Fargate1 -> DynamoDB (timings, routed left of Fargate2) -->
+          <g class="pipe-b">
+          <path class="bdyn" d="M480,252 C430,340 430,440 476,470" marker-end="url(#bDyn)"/>
+          <text class="bfmt" x="360" y="450" fill="#8a8f98">每回合时间戳</text>
+          </g>
+        </svg>
+    </div>
+    <p class="muted" style="font-size:.85rem;margin-top:.6rem">
+      <span style="color:#0a7d7d;font-weight:600">青色</span>＝音频流；<span style="color:#ec7211;font-weight:600">橙色</span>＝文字；<span style="color:#8a8f98;font-weight:600">灰色虚线</span>＝时间戳写库。
+      两个 Fargate 服务<strong>必须分开</strong>：Transcribe 依赖 <code>awscrt~=0.26</code>，而 Nova Sonic 的 <code>aws-sdk-bedrock-runtime</code> 需要 <code>awscrt~=0.32</code>——版本冲突无法共存于一个进程，故拆成两镜像、两服务，挂同一 ALB 用<strong>路径</strong>区分。三条管线的延迟都从「说完话」起算，因此面板数字可直接横向对比。
+    </p>
+    <div class="card" style="margin-top:1rem; border-left:3px solid #1f8a4c">
+      <h3 style="margin:0 0 .3rem">📟 IoT 设备接入（方案 B / C）</h3>
+      <p class="muted" style="font-size:.9rem">
+        与方案 A 不同：这里传输就是<strong>一条 WebSocket</strong>，设备可<strong>带票直连</strong> <code>/ws/session</code> 或 <code>/ws/nova</code>、双向推 PCM——<strong>无需信令/媒体分离，也不需要观测网页</strong>，比方案 A 的 voice gateway（WebRTC 所迫的复杂结构）简单得多。本演示以文档说明该路径，<strong>未单独实现</strong>；主演示页的「浏览器麦克风 → WSS → Fargate」已等价演示了 B/C 设备的数据路径，差别仅在 WSS 上加一层票据鉴权。方案 A 的完整设备接入见 <a href="gateway.html">IoT 设备接入演示</a>。
+      </p>
+    </div>
+  </section>
+
+  <!-- ============ 方案 B · TRANSCRIBE FLOW ============ -->
+  <section class="wrap" data-impl-panel="transcribe">
+    <div class="eyebrow">Scenario Data Flow · 场景数据流（方案 B · Transcribe）</div>
+    <h2 class="display">Transcribe 管线：一次提问怎么走（自控三段）</h2>
+    <p class="lead" style="margin-top:.6rem">
+      同样以「西雅图天气怎么样？」为例。与 Connect 不同：<strong>不经 Connect / Lex</strong>，浏览器直接用 WebSocket 连到 Fargate，服务端亲自串起 <span style="color:var(--orange-deep);font-weight:600">ASR → LLM → TTS</span> 三段，因此每段都能<strong>精确计时</strong>。
+    </p>
+    <div class="flow">
+      <div class="step"><div class="num">1</div><div class="body">
+        <span class="who you">浏览器</span> · <span class="t">选 Transcribe，点击「开始通话」</span>
+        <p>建立 WSS 到 ALB → <code>/ws/session</code>，发送 <code>start(language)</code>。AudioWorklet 采集麦克风降采样到 16k PCM，批量 512 样本（≈32ms）经 WebSocket 上行。UI 显示「⏳ 连接中」。</p>
+      </div></div>
+      <div class="step"><div class="num">2</div><div class="body">
+        <span class="who fg">Fargate 服务① · Transcribe 管线</span> · <span class="t">开流</span>
+        <p>收到 <code>start</code> 后打开 <strong>Amazon Transcribe</strong> 流式会话，回 <code>audio_format(16k)</code> 与 <code>status=active</code>。UI 切到「🎙️ 正在听」。</p>
+      </div></div>
+      <div class="step"><div class="num">3</div><div class="body">
+        <span class="who you">你</span> · <span class="t">说出问题</span>
+        <p>“What's the weather in Seattle?” 浏览器持续上行 PCM；服务端 <strong>webrtcvad</strong> 逐 20ms 帧判定是否为语音，Transcribe 同时回流式 partial / final 文字。</p>
+      </div></div>
+      <div class="step"><div class="num">4</div><div class="body">
+        <span class="who fg">Fargate · 端点检测</span> · <span class="t">判定「说完话」</span>
+        <p>当音频静音 ≥ <code>VAD_SILENCE_MS</code> <em>且</em> Transcribe 停止更新 ≥ <code>SETTLE_MS</code>，判定回合结束——锚定 <code>t_speech_end</code>（最后一帧语音），取最终整句。UI 切到「💭 思考中」。双条件避免把说话中的停顿误判成结束、也避免抢到滞后半句。</p>
+      </div></div>
+      <div class="step"><div class="num">5</div><div class="body">
+        <span class="who aws">Fargate → Bedrock</span> · <span class="t">LLM 推理 + 工具调用</span>
+        <p><strong>Bedrock Converse</strong> 流式（Claude Haiku，可换模型）。命中 <code>get_weather</code> → 执行工具逻辑（<code>tools.dispatch</code>，确定性），把结果回喂模型产出一句回复。记录 <code>t_llm_first_token</code> / <code>t_llm_done</code>。支持一轮多工具（如「巴黎天气 + 纽约时间」）。</p>
+      </div></div>
+      <div class="step"><div class="num">6</div><div class="body">
+        <span class="who aws">Fargate → Polly</span> · <span class="t">合成并回放</span>
+        <p><strong>Amazon Polly</strong> neural（Matthew / Zhiyu）流式 PCM：首字节即 <code>t_tts_first_byte</code> / <code>t_first_audio_out</code>，边合成边经 WSS 下行。浏览器播放，并按墙钟<strong>半双工静音</strong>麦克风防回声。UI 切到「🔊 正在回答」。</p>
+      </div></div>
+      <div class="step"><div class="num">7</div><div class="body">
+        <span class="who fg">Fargate · 计时落库 + 推面板</span> · <span class="t">精确三段</span>
+        <p><code>turn.persist()</code> 写 DynamoDB <code>turn-timings</code>；同时 WS 推 <code>timing</code>（asr / llm / tts / e2e，均<strong>从「说完话」起算</strong>）。面板即时显示分段条与总延迟（≈2.3s，LLM 主导）。</p>
+      </div></div>
+      <div class="step"><div class="num">8</div><div class="body">
+        <span class="who cf">字幕 · 实时</span> · <span class="t">随回合推送</span>
+        <p><code>transcript</code> 消息（CUSTOMER / BOT）随回合直接经 WS 推送——<strong>无需轮询日志</strong>（与 Connect 的 CloudWatch 轮询不同），字幕与语音基本同步。</p>
+      </div></div>
+    </div>
+  </section>
+
+  <!-- ============ 方案 C · NOVA SONIC FLOW ============ -->
+  <section class="wrap" data-impl-panel="nova">
+    <div class="eyebrow">Scenario Data Flow · 场景数据流（方案 C · Nova Sonic）</div>
+    <h2 class="display">Nova Sonic 管线：一次提问怎么走（端到端 S2S）</h2>
+    <p class="lead" style="margin-top:.6rem">
+      Nova Sonic 是<strong>一条双向 Bedrock 流</strong>：音频进、音频出，识别 / 推理 / 合成都在模型内部完成。因此<strong>无法切分单段</strong>，只报端到端总延迟——但最快（≈1.4s）。前端与 Transcribe 完全一致，只是连到 <code>/ws/nova</code>。
+    </p>
+    <div class="flow">
+      <div class="step"><div class="num">1</div><div class="body">
+        <span class="who you">浏览器</span> · <span class="t">选 Nova Sonic，点击「开始通话」</span>
+        <p>建立 WSS 到 ALB → <code>/ws/nova</code>，发送 <code>start(language)</code>。前端采集/上行 16k PCM 与 Transcribe 管线相同（同一 <code>stream.js</code>）。UI「⏳ 连接中」。</p>
+      </div></div>
+      <div class="step"><div class="num">2</div><div class="body">
+        <span class="who fg">Fargate 服务② · Nova Sonic</span> · <span class="t">开双向流</span>
+        <p>打开 Bedrock <code>InvokeModelWithBidirectionalStream</code>（Nova 2 Sonic），下发 <code>promptStart</code>：system prompt + 工具配置（注意 <code>inputSchema.json</code> 须为 <strong>JSON 字符串</strong>，否则被拒）。回 <code>audio_format(24k)</code> + <code>status=active</code>。UI「🎙️ 正在听」。</p>
+      </div></div>
+      <div class="step"><div class="num">3</div><div class="body">
+        <span class="who you">你</span> · <span class="t">说出问题</span>
+        <p>PCM 直接灌给 Nova；<strong>Nova 自己做 ASR 与端点/回合判定</strong>（无需 webrtcvad）。服务端收到 <code>USER</code> 转写即视为回合起点，锚定 <code>t_asr_final</code>（≈说完话，故不含说话时长）。</p>
+      </div></div>
+      <div class="step"><div class="num">4</div><div class="body">
+        <span class="who aws">Amazon Bedrock · Nova 2 Sonic</span> · <span class="t">端到端生成</span>
+        <p>模型内部一体完成 识别 → 推理 → 语音合成。若需数据，发 <code>toolUse</code> 事件 → 服务端 <code>dispatch</code> 执行 <code>get_weather</code> → 结果回喂；随后流式吐出 24k PCM 音频 + <code>ASSISTANT</code> 转写。</p>
+      </div></div>
+      <div class="step"><div class="num">5</div><div class="body">
+        <span class="who fg">Fargate · 首音频回放 + 计时</span> · <span class="t">端到端总延迟</span>
+        <p>收到该回合<strong>第一个音频块</strong>即 <code>t_first_audio_out</code>，算 <code>e2e = 首音频 − USER 转写</code>；WS 推 <code>timing(e2e)</code> 并下行音频。浏览器播放、半双工静音。UI「🔊 正在回答」。面板显示<strong>端到端总延迟（≈1.4s）</strong>，不可切分单段。</p>
+      </div></div>
+      <div class="step"><div class="num">6</div><div class="body">
+        <span class="who fg">Fargate · 落库 + 字幕</span> · <span class="t">按回合分段</span>
+        <p><code>turn.persist()</code> 写 DynamoDB（<code>e2e</code> 而非三段）；每个 <code>USER</code> 转写开启新回合，避免把一次回复的多个音频块拆成多回合。字幕随 <code>transcript</code> 实时推送。</p>
+      </div></div>
+    </div>
+    <div style="margin-top:1.4rem; display:flex; gap:.8rem; flex-wrap:wrap">
+      <a class="btn btn-primary" href="index.html">▶ 打开实时演示（可切三方案）</a>
+    </div>
+  </section>
+
   <!-- ============ VOICE DATA-FORMAT PIPELINE ============ -->
-  <section class="wrap">
-    <div class="eyebrow">Voice Pipeline · 语音数据形态流转</div>
+  <section class="wrap" data-impl-panel="connect">
+    <div class="eyebrow">Voice Pipeline · 语音数据形态流转（方案 A · Connect）</div>
     <h2 class="display">音频 ↔ 文字：谁做 ASR、谁做 TTS</h2>
     <p class="lead" style="margin-top:.6rem">
       关键澄清：<strong>ASR 和 TTS 都由 “Amazon Connect agentic voice” 这一个 provider 完成</strong>（同一个提供方，两个环节）。<strong>Lex V2 不是 ASR 引擎</strong>——它是对话/编排层（NLU），负责管理回合、把识别出的文字交给 <code>QInConnect</code> intent，并通过 <code>x-amz-lex</code> 会话属性控制 ASR 行为（结束回合判定、barge-in）。下图按数据形态把链路拆开：<span style="color:var(--teal);font-weight:600">青色＝音频流</span>，<span style="color:var(--orange-deep);font-weight:600">橙色＝文字</span>。
@@ -291,8 +581,8 @@
   </section>
 
   <!-- ============ SCENARIO DATA FLOW ============ -->
-  <section class="wrap">
-    <div class="eyebrow">Scenario Data Flow · 场景数据流（核心）</div>
+  <section class="wrap" data-impl-panel="connect">
+    <div class="eyebrow">Scenario Data Flow · 场景数据流（方案 A · Connect）</div>
     <h2 class="display">一次语音提问，数据怎么走</h2>
     <p class="lead" style="margin-top:.6rem">以“西雅图天气怎么样？”为例，走 <strong>①浏览器直连线</strong>，从点击开始到听见回答的完整链路。</p>
     <p class="muted" style="font-size:.9rem;margin-top:.4rem">
@@ -336,8 +626,8 @@
   </section>
 
   <!-- ============ VOICE GATEWAY LINE ============ -->
-  <section class="wrap">
-    <div class="eyebrow">Voice Gateway · 抽象出独立网关，贴近客户真实链路</div>
+  <section class="wrap" data-impl-panel="connect">
+    <div class="eyebrow">Voice Gateway · 抽象出独立网关（方案 A · Connect）</div>
     <h2 class="display">第二条线：IoT 设备如何鉴权接入语音网关</h2>
     <p class="lead" style="margin-top:.6rem">
       直接对话线是「人对着浏览器说话」。而客户的真实场景是「设备连上一个语音网关」。我们把语音能力后面隐含的 <strong>voice gateway</strong> 抽象成独立组件：一个真实的 IoT 设备（EC2 常驻进程）向 IoT Core 拿短期票，用<strong>长连接</strong>接入网关；网关验票通过后才发起 Connect 会话。<strong>信令</strong>（鉴权+编排）由网关走 WebSocket，<strong>媒体</strong>（音频）由网页代表设备麦克风直连 Connect——两者分离，是 WebRTC 的标准做法。
@@ -414,8 +704,8 @@
   </section>
 
   <!-- ============ RESPONSIBILITY TABLE ============ -->
-  <section class="wrap">
-    <div class="eyebrow">Ownership · 我们写什么 vs Connect 托管什么</div>
+  <section class="wrap" data-impl-panel="connect">
+    <div class="eyebrow">Ownership · 我们写什么 vs Connect 托管什么（方案 A）</div>
     <table class="tbl">
       <tr><th style="width:26%">组件</th><th style="width:34%">谁负责</th><th>实现</th></tr>
       <tr><td>ASR / TTS（agentic voice）</td><td>Amazon Connect 托管</td><td>Contact Flow 的 Set voice 块</td></tr>
@@ -438,6 +728,29 @@
     </div>
   </section>
 
-  <div class="footer"><div class="wrap">Amazon Connect 语音 AI 演示 · 沙箱环境 · 仅供方案演示</div></div>
+  <div class="footer"><div class="wrap">Amazon 语音 AI 演示 · 沙箱环境 · 仅供方案演示</div></div>
+
+  <script>
+    (function () {
+      const HINT = {
+        connect: '下面展示 <b>方案 A（Connect）</b> 的总览、数据形态、场景数据流与 IoT 设备接入。上方对比表始终可见。',
+        transcribe: '下面展示 <b>方案 B（Transcribe）</b> 的自控流式架构与场景数据流。上方对比表始终可见。',
+        nova: '下面展示 <b>方案 C（Nova Sonic）</b> 的端到端架构与场景数据流。上方对比表始终可见。'
+      };
+      const tabs = document.querySelectorAll('.impl-tab');
+      const panels = document.querySelectorAll('[data-impl-panel]');
+      const hint = document.getElementById('implHint');
+      const arch = document.getElementById('bcArch');
+      function sel(k) {
+        tabs.forEach(t => t.classList.toggle('active', t.dataset.impl === k));
+        panels.forEach(p => p.classList.toggle('active', p.dataset.implPanel.split(' ').includes(k)));
+        if (hint && HINT[k]) hint.innerHTML = HINT[k];
+        // highlight the selected pipeline in the shared B/C streaming diagram
+        if (arch && (k === 'transcribe' || k === 'nova')) arch.dataset.active = k;
+      }
+      tabs.forEach(t => t.addEventListener('click', () => sel(t.dataset.impl)));
+      sel('connect');
+    })();
+  </script>
 </body>
 </html>

@@ -2,7 +2,7 @@
 
 一个在浏览器里用语音和 AI 对话的演示，跑在 **Amazon Connect** 上。你打开网页、点 Start、对着麦克风说话，它会语音回复，并在需要时调用两个简单工具（`get_current_time`、`get_weather`）。
 
-这是 [`../chatbot-demo`](../chatbot-demo)（基于 **Amazon Nova Sonic**）的 Connect 版对等实现。由于 **Nova Sonic 即将下线**，这个版本改用 Amazon Connect 的原生能力，**完全不依赖 Nova Sonic**：
+这是 [`../chatbot-demo`](../chatbot-demo)（基于 **Amazon Nova Sonic**）的 Connect 版对等实现。本版本演示用 **Amazon Connect 的原生能力**（agentic voice）实现同等体验，作为 Nova Sonic 端到端方案的一个替代对照，**完全不依赖 Nova Sonic**：
 
 - **接入**：浏览器 web calling（WebRTC），和原 demo 一样是「网页 + 麦克风语音流」，**不需要电话号码**。
 - **语音**：Connect **agentic voice** 的 ASR + TTS（富有表现力、支持打断），**不使用 Nova Sonic Speech-to-Speech**。
@@ -37,7 +37,7 @@
 cd connect-demo
 npm install
 
-export CDK_DEFAULT_ACCOUNT=613477150601
+export CDK_DEFAULT_ACCOUNT=<your-account-id>
 export CDK_DEFAULT_REGION=us-west-2   # 注意：若 shell 里已有 AWS_REGION 会覆盖此项
 
 npm run deploy
@@ -94,10 +94,11 @@ npm run synth     # CDK 合成，验证模板无误
 | `lambda/webcall/handler.js` | 发起 web call（`StartWebRTCContact`），经 API Gateway 暴露；含 `/issue-ticket` `/gw-config` |
 | `lambda/gateway/` | voice gateway 的 WebSocket Lambda（`handler.js`）+ 移植的验票纯函数（`auth.js`）—— 仅 `-c enableGateway=true` 时部署 |
 | `device/device.js` | EC2 上模拟的 IoT 设备进程（拿票 → WS 长连接 → 起会话）；零依赖，Node 22 全局 `fetch`/`WebSocket` |
-| `web/` | 浏览器页面（托管在 S3，经 CloudFront）：Start/Stop + Amazon Chime SDK WebRTC；`gateway.html` 是 IoT 线观测台 |
+| `web/` | 浏览器页面（托管在 S3，经 CloudFront）：Start/Stop + Amazon Chime SDK WebRTC；`gateway.html` 是 IoT 线观测台；`stream.js` 是方案 B 流式客户端 |
+| `streaming-backend/` | 方案 B 自控流式管线后端（Python：Transcribe+Bedrock+Polly，AgentCore Runtime）——**脚手架，未部署**，见 [`docs/latency-optimization-plan.md`](docs/latency-optimization-plan.md) |
 | `flows/agentic-voice-flow.json` | 可导入的 Contact Flow 定义 |
 | `prompts/orchestration-prompt.md` | AI agent 的 orchestration prompt |
-| `docs/` | 架构说明 + 控制台补充步骤 |
+| `docs/` | 架构说明 + 控制台补充步骤 + [延迟丈量与模型选型](docs/latency.md) + [延迟优化方案(两条路)](docs/latency-optimization-plan.md) |
 
 ## 清理
 
@@ -112,4 +113,5 @@ npm run destroy
 - 电话号码 / PSTN 接入（本 demo 只走浏览器 web calling）。
 - 真实天气 API（`get_weather` 返回确定性模拟数据，可离线演示）。
 - 转人工队列的完整实现（flow 里预留了 `Escalate` 路由，但没接真实 agent）。
+- **ASR/LLM/TTS 分段延迟丈量**——三段由 Connect agentic voice 托管，拿不到分段边界事件；只能测端到端回合延迟。详见 [`docs/latency.md`](docs/latency.md)。
 - AI agent 的 MCP **工具挂载**（运行时依赖：需 JWT 就绪后在控制台完成，见 `docs/console-setup.md` 第 3 节）。其余全链路——工具、Gateway+MCP 注册、JWT 授权、Lex bot、Contact Flow、web calling、AI agent/prompt/assistant/security profile——均已 CDK 自动化并实机验证。

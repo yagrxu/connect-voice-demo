@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>部署与调优 · Connect 语音 AI</title>
+  <title>部署与调优 · 语音 AI 演示</title>
   <link rel="stylesheet" href="site.css">
   <style>
     .steps { counter-reset: s; display:flex; flex-direction:column; gap:.7rem; margin-top:1.2rem; }
@@ -20,11 +20,20 @@
     .tune { border-left: 3px solid var(--teal); }
     .tune h3 { color: var(--ink); }
     .tune .why { font-size:.86rem; color:var(--muted); margin-top:.35rem; }
+    .impl-tabs { display:flex; gap:.5rem; flex-wrap:wrap; margin:1.6rem 0 .4rem; }
+    .impl-tab { font:inherit; font-weight:600; font-size:.9rem; padding:.55rem 1.05rem; border:1px solid var(--line);
+      border-radius:10px; background:var(--card); color:var(--ink-2); cursor:pointer; box-shadow:var(--shadow); transition:all .15s; }
+    .impl-tab:hover { border-color:var(--orange); color:var(--ink); }
+    .impl-tab.active { background:var(--ink); color:#fff; border-color:var(--ink); }
+    .impl-tab .tag { font-family:var(--mono); font-size:.7rem; opacity:.7; margin-left:.35rem; }
+    .impl-hint { font-size:.83rem; color:var(--muted); margin:.2rem 0 .4rem; }
+    [data-impl-panel] { display:none; }
+    [data-impl-panel].active { display:block; }
   </style>
 </head>
 <body>
   <nav class="nav"><div class="nav-inner">
-    <a class="brand" href="index.html"><span class="spark">◆</span> Connect 语音 AI</a>
+    <a class="brand" href="index.html"><span class="spark">◆</span> 语音 AI 演示</a>
     <div class="nav-links">
       <a href="index.html">演示</a>
       <a href="product.html">产品介绍</a>
@@ -41,10 +50,37 @@
     <p class="lead" style="margin-top:.8rem">
       绝大部分基础设施由 CDK 一次部署完成。少数资源因为 CloudFormation 尚未覆盖（多为 preview 能力），改用 SDK / <code>AwsCustomResource</code> 或控制台一次性配置。下面如实列出边界——这也是迁移时最容易踩坑的地方。
     </p>
+    <p class="lead" style="margin-top:.8rem; font-size:1rem">
+      本演示有<strong>三种技术实现</strong>、两套部署轨道：<strong>方案 A（Connect）</strong>走主栈（Connect / Lex / Wisdom / AgentCore）；<strong>方案 B（Transcribe）与方案 C（Nova Sonic）</strong>走<strong>同一个独立 StreamingStack</strong>（<code>-c enableStreaming=true</code>），与 Connect 栈完全隔离。用下方选择器切换查看每种实现的部署与调优；两套轨道的对比表始终可见。
+    </p>
   </div>
 
-  <section class="wrap section-tight">
-    <div class="eyebrow">Flow · 部署步骤</div>
+  <!-- ============ DEPLOY COMPARISON（始终可见） ============ -->
+  <section class="wrap">
+    <div class="eyebrow">Tracks · 两套部署轨道对比</div>
+    <table class="tbl" style="margin-top:.6rem">
+      <tr><th style="width:18%">维度</th><th style="width:41%">方案 A · Connect（主栈）</th><th style="width:41%">方案 B/C · Transcribe / Nova Sonic（StreamingStack）</th></tr>
+      <tr><td>CDK 栈</td><td>主栈：Connect / Lex / Wisdom / AgentCore</td><td>独立 <code>ConnectVoiceDemoStreamingStack</code>（与主栈隔离）</td></tr>
+      <tr><td>开关</td><td><code>-c enableAiAgent</code> · <code>jwt*</code> · <code>enableGateway</code></td><td><code>-c enableStreaming=true</code></td></tr>
+      <tr><td>前置</td><td>Connect Customer 实例（仅控制台）+ Bedrock 模型</td><td>仅 Bedrock 模型访问（Claude Haiku / Nova 2 Sonic）</td></tr>
+      <tr><td>计算</td><td>Connect 托管</td><td>ECS Fargate（ARM64）×2 + 共用 ALB(WSS)</td></tr>
+      <tr><td>镜像构建</td><td>无（托管）</td><td><strong>podman</strong>（<code>CDK_DOCKER=podman</code>），两个 ARM64 镜像</td></tr>
+      <tr><td>可测量性</td><td>黑盒，仅 ≈ 估算</td><td>DynamoDB <code>turn-timings</code> 精确时间戳</td></tr>
+    </table>
+  </section>
+
+  <!-- implementation selector -->
+  <div class="wrap" style="padding-top:0">
+    <div class="impl-tabs" role="tablist">
+      <button class="impl-tab active" data-impl="connect">Connect<span class="tag">方案 A</span></button>
+      <button class="impl-tab" data-impl="transcribe">Transcribe<span class="tag">方案 B</span></button>
+      <button class="impl-tab" data-impl="nova">Nova Sonic<span class="tag">方案 C</span></button>
+    </div>
+    <p class="impl-hint" id="implHint">下面展示 <b>方案 A（Connect）</b> 的部署步骤、CDK/SDK 边界与调优。上方轨道对比始终可见。</p>
+  </div>
+
+  <section class="wrap section-tight" data-impl-panel="connect">
+    <div class="eyebrow">Flow · 部署步骤（方案 A · Connect）</div>
     <div class="steps">
       <div class="dstep"><div class="n"></div><div class="c">
         <strong>前置</strong>：目标账号/区域启用 <strong>Connect Customer</strong>（下一代实例，agentic voice / AI agent designer 的前提，仅控制台）；Bedrock 控制台开通所需模型访问。
@@ -67,8 +103,8 @@
     </p>
   </section>
 
-  <section class="wrap">
-    <div class="eyebrow">Boundary · CDK 支持 vs 需要 SDK</div>
+  <section class="wrap" data-impl-panel="connect">
+    <div class="eyebrow">Boundary · CDK 支持 vs 需要 SDK（方案 A · Connect）</div>
     <h2 class="display">哪些能一键，哪些要手动补</h2>
 
     <div class="lane-h"><span class="pill cdk">CDK 自动</span> 一次 <code>cdk deploy</code> 完成、已实机验证</div>
@@ -103,8 +139,65 @@
     </table>
   </section>
 
-  <section class="wrap">
-    <div class="eyebrow">Tuning · 调优与踩坑细节</div>
+  <!-- ============ 方案 B/C STREAMING DEPLOY (shared) ============ -->
+  <section class="wrap" data-impl-panel="transcribe nova">
+    <div class="eyebrow">Streaming · 方案 B/C 部署（Transcribe / Nova Sonic 共用）</div>
+    <h2 class="display">自控流式管线怎么部署</h2>
+    <p class="lead" style="margin-top:.6rem">
+      方案 B 不依赖 Connect Customer / Lex / Wisdom，是一套独立的 <strong>ECS Fargate（ARM64/Graviton）+ ALB(WSS)</strong> 流式后端，与 Connect 主栈隔离，用 <code>-c enableStreaming=true</code> 单独开启。<strong>镜像用 podman 构建</strong>（本环境 Docker Desktop 被 org 登录门槛挡住）。
+    </p>
+    <div class="steps">
+      <div class="dstep"><div class="n"></div><div class="c">
+        <strong>前置</strong>：无需 Connect Customer。仅需在 Bedrock 控制台开通模型访问——<strong>Claude Haiku</strong>（Transcribe 管线的 LLM）与 <strong>Nova 2 Sonic</strong>（端到端）。已有自定义域名/托管区则自动配 ACM + Route53。
+      </div></div>
+      <div class="dstep"><div class="n"></div><div class="c">
+        <strong>一键部署</strong>：<code>CDK_DOCKER=podman npx cdk deploy ConnectVoiceDemoStreamingStack -c enableStreaming=true</code>。CDK 用 <strong>podman</strong> 构建<strong>两个 ARM64 镜像</strong>并推 ECR，建 VPC（公网子网、无 NAT）、ECS 集群、ALB(HTTPS/WSS)、DynamoDB <code>turn-timings</code>。
+      </div></div>
+      <div class="dstep"><div class="n"></div><div class="c">
+        <strong>两个 Fargate 服务，一个 ALB</strong>：服务① Transcribe 管线挂 <code>/ws/session</code>；服务② Nova Sonic 挂 <code>/ws/nova</code>，由 ALB <strong>按路径路由</strong>。两者<strong>必须分开</strong>——见下方「awscrt 版本冲突」。各带 <code>/health</code> 健康检查 + 会话粘滞（保持 WS 落在同一 task）。
+      </div></div>
+      <div class="dstep"><div class="n"></div><div class="c">
+        <strong>前端接线</strong>：<code>web/app.js</code> 的 <code>STREAM_WS</code> 把每个方案映射到各自路径（transcribe→<code>/ws/session</code>、nova-sonic→<code>/ws/nova</code>）。改完 <code>aws s3 sync web/</code> + CloudFront 失效即可，无需动 Connect 栈。
+      </div></div>
+    </div>
+    <p class="muted" style="font-size:.85rem;margin-top:1rem">
+      精确的每回合时间戳（ASR/LLM/TTS/E2E）由服务端写入 DynamoDB <code>turn-timings</code>，并经 WS 实时推给延迟面板——这正是方案 B/C 相对 Connect 黑盒最大的价值：<strong>可测量</strong>。
+    </p>
+    <div class="lane-h"><span class="pill cdk">CDK 自动</span> StreamingStack 资源（全部 <code>cdk deploy</code> 完成、已实机验证）</div>
+    <table class="tbl">
+      <tr><th style="width:42%">资源 / 能力</th><th>CloudFormation 类型</th></tr>
+      <tr><td>Fargate 服务 ×2（Transcribe / Nova Sonic，ARM64）</td><td><code>AWS::ECS::Service / TaskDefinition</code> + <code>ContainerImage.fromAsset</code>（podman）</td></tr>
+      <tr><td>共用 ALB（WSS）+ 按路径路由</td><td><code>ApplicationLoadBalancedFargateService</code> + <code>ListenerRule</code>（<code>/ws/nova</code>）</td></tr>
+      <tr><td>WSS 证书 + 自定义域名</td><td><code>ACM Certificate</code> + <code>Route53 A 记录</code>（stream.&lt;zone&gt;）</td></tr>
+      <tr><td>每回合时间戳表</td><td><code>AWS::DynamoDB::Table</code>（<code>turn-timings</code>，含 TTL）</td></tr>
+      <tr><td>任务角色权限</td><td><code>transcribe:* · bedrock:ConverseStream · bedrock:InvokeModelWithBidirectionalStream · polly:SynthesizeSpeech</code></td></tr>
+    </table>
+  </section>
+
+  <section class="wrap" data-impl-panel="transcribe nova">
+    <div class="eyebrow">Streaming Tuning · 方案 B/C 调优与踩坑</div>
+    <h2 class="display">把流式管线做稳、做快的那些细节</h2>
+    <p class="lead" style="margin-top:.5rem">逐一实机验证：从会拆句、有回声、卡顿，到稳定的 ≈2.3s / ≈1.4s。</p>
+    <div class="grid grid-2" style="margin-top:1.3rem">
+      <div class="card tune" style="border-left-color:var(--orange)"><h3>⏱️ 计时锚点 = 说完话</h3><p>三段/端到端都从 <code>t_speech_end</code>（最后一帧语音）起算，而非说话起点。<span class="why">否则说得越久 ASR/总延迟越虚高，无法公平对比模型。</span></p></div>
+      <div class="card tune" style="border-left-color:var(--orange)"><h3>🎯 webrtcvad 判定「说完话」</h3><p>用真·语音活动检测（voiced/unvoiced）而非能量阈值。<span class="why">能量 VAD 会把轻声词（如没重读的 “Tokyo”）当静音而误触发结束、拆句。</span></p></div>
+      <div class="card tune" style="border-left-color:var(--orange)"><h3>🧩 双条件结束回合</h3><p>音频静音 ≥ <code>VAD_SILENCE_MS</code> <em>且</em> Transcribe 停更 ≥ <code>SETTLE_MS</code> 才结束。<span class="why">只看其一：会被 partial 突发拆句，或抢到滞后半句。<code>SETTLE_MS=500</code> 是地板——400 会截断最后一个词（Seattle→“Seat”）。</span></p></div>
+      <div class="card tune" style="border-left-color:var(--orange)"><h3>🔇 客户端半双工静音</h3><p>回声抑制放在浏览器、按<strong>墙钟</strong>在播放期间静音麦克风。<span class="why">最初放服务端会过度静音、削掉用户下一句的开头。</span></p></div>
+      <div class="card tune" style="border-left-color:var(--orange)"><h3>📦 批量 512 样本再上行</h3><p>AudioWorklet 每帧就发（≈344 次/秒）会压垮主线程导致丢帧；批到 ≈32ms 再经 WS 发。<span class="why">丢帧表现为识别断续、回合错乱。</span></p></div>
+      <div class="card tune" style="border-left-color:var(--orange)"><h3>🔧 一轮多工具</h3><p>Bedrock Converse 一个回合可能有多个 <code>toolUse</code> 块（按 <code>contentBlockIndex</code> 区分）。<span class="why">“巴黎天气 + 纽约时间”会同时触发两个工具——按块分别累积 JSON，别拼接。</span></p></div>
+      <div class="card tune" style="border-left-color:#6d4bd8"><h3>⚔️ awscrt 版本冲突 → 拆两服务</h3><p><code>amazon-transcribe</code> 需 <code>awscrt~=0.26</code>，<code>aws-sdk-bedrock-runtime</code>（Nova）需 <code>awscrt~=0.32</code>，无法共存于一个进程。<span class="why">故拆成两镜像、两 Fargate 服务，挂同一 ALB 用<strong>路径</strong>区分。</span></p></div>
+      <div class="card tune" style="border-left-color:#6d4bd8"><h3>🧾 Nova promptStart 的 schema 要字符串</h3><p>Nova Sonic 的 <code>promptStart.toolConfiguration</code> 里 <code>inputSchema.json</code> 必须是 <strong>JSON 字符串</strong>（Bedrock Converse 用 dict）。<span class="why">传 dict 会被拒：“Unable to parse input chunk”。</span></p></div>
+      <div class="card tune" style="border-left-color:#6d4bd8"><h3>🔁 Nova 按 USER 转写分回合</h3><p>Nova 每个响应流很多音频块，别每块开新回合；以新的 <code>USER</code> 转写为回合起点。<span class="why">否则时间戳被拆成一堆假回合。</span></p></div>
+      <div class="card tune"><h3>🧱 镜像用 podman，架构对齐 ARM64</h3><p>用 <code>CDK_DOCKER=podman</code> 构建（Docker Desktop 被 org 登录挡住）；镜像与 Fargate <code>runtimePlatform</code> 都设 <strong>ARM64</strong>。<span class="why">x86 镜像跑在 ARM64 task 会 <code>exec format error</code>；ARM 原生构建也免 QEMU 跨构建、Graviton 更省。</span></p></div>
+    </div>
+    <div style="margin-top:1.6rem; display:flex; gap:.8rem; flex-wrap:wrap">
+      <a class="btn btn-primary" href="index.html">▶ 打开实时演示（可切三方案）</a>
+      <a class="btn btn-ghost" href="architecture.html">看方案 B 架构与数据流</a>
+    </div>
+  </section>
+
+  <section class="wrap" data-impl-panel="connect">
+    <div class="eyebrow">Tuning · 调优与踩坑细节（方案 A · Connect）</div>
     <h2 class="display">让它“像样”的那些细节</h2>
     <p class="lead" style="margin-top:.5rem">从能跑通到好用，逐一实机验证出来的经验。</p>
     <div class="grid grid-2" style="margin-top:1.3rem">
@@ -127,6 +220,26 @@
     </div>
   </section>
 
-  <div class="footer"><div class="wrap">Amazon Connect 语音 AI 演示 · 沙箱环境 · 仅供方案演示</div></div>
+  <div class="footer"><div class="wrap">Amazon 语音 AI 演示 · 沙箱环境 · 仅供方案演示</div></div>
+
+  <script>
+    (function () {
+      const HINT = {
+        connect: '下面展示 <b>方案 A（Connect）</b> 的部署步骤、CDK/SDK 边界与调优。上方轨道对比始终可见。',
+        transcribe: '下面展示 <b>方案 B（Transcribe）</b> 所在的流式栈部署与调优（与方案 C 共用基础设施）。',
+        nova: '下面展示 <b>方案 C（Nova Sonic）</b> 所在的流式栈部署与调优（与方案 B 共用基础设施）。'
+      };
+      const tabs = document.querySelectorAll('.impl-tab');
+      const panels = document.querySelectorAll('[data-impl-panel]');
+      const hint = document.getElementById('implHint');
+      function sel(k) {
+        tabs.forEach(t => t.classList.toggle('active', t.dataset.impl === k));
+        panels.forEach(p => p.classList.toggle('active', p.dataset.implPanel.split(' ').includes(k)));
+        if (hint && HINT[k]) hint.innerHTML = HINT[k];
+      }
+      tabs.forEach(t => t.addEventListener('click', () => sel(t.dataset.impl)));
+      sel('connect');
+    })();
+  </script>
 </body>
 </html>

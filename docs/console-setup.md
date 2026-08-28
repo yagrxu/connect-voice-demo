@@ -70,7 +70,7 @@ Lex V2 bot（Bot/Version/Alias）、LEX_BOT 关联、以及 Contact Flow（`Stat
 只需在控制台对**这个已建好的 bot** 补两项 agentic self-service 配置：
 1. 在 bot 上**启用 Connect Customer AI agent intent**（把 bot 接到第 3 步的 orchestrator AI agent）。
 2. **Speech Configuration**：Voice Provider 选 **Amazon Connect agentic voice**，Speech model 选 **Advanced**。
-   - ⚠️ 不要选 **Nova Sonic**（Speech-to-Speech）——本 demo 的目的就是替换掉要下线的 Nova Sonic。
+   - ⚠️ 本 demo 刻意选 Connect agentic voice、不选 **Nova Sonic**（Speech-to-Speech），以演示 Connect 原生的三段能力作为对照。（Nova Sonic 本身仍是可用产品。）
 
 （如果你想用自己在控制台单独建的 bot 替换 CDK 建的，部署时传 `-c botAliasArn=<你的 bot alias ARN>`。）
 

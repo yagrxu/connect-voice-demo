@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Connect 语音 AI 演示 · IoT 设备接入</title>
+    <title>语音 AI 演示 · IoT 设备接入</title>
     <link rel="stylesheet" href="site.css">
     <style>
         /* Element IDs consumed by gateway.js — do not rename:
@@ -55,7 +55,7 @@
 <body>
     <nav class="nav">
       <div class="nav-inner">
-        <a class="brand" href="index.html"><span class="spark">◆</span> Connect 语音 AI</a>
+        <a class="brand" href="index.html"><span class="spark">◆</span> 语音 AI 演示</a>
         <div class="nav-links">
           <a href="index.html">演示</a>
           <a href="product.html">产品介绍</a>
@@ -72,6 +72,9 @@
       <h1 class="display">一个注册的 IoT 设备，<br>如何鉴权接入语音网关。</h1>
       <p class="lead" style="margin-top:1rem">
         这条线把语音能力抽象成一个独立的 <strong>voice gateway</strong>：真实的 IoT 设备（EC2 上常驻的 <span class="mono">speaker-001</span> 进程）先向 IoT Core 拿一张短期票，再用长连接接入网关；网关验票通过后才发起 Connect 语音会话。本页是<strong>观测台</strong>——它按同一个配对码连上网关，展示设备与网关之间发生的每一步，并作为设备的“麦克风/扬声器”承载真实音频。
+      </p>
+      <p class="muted" style="font-size:.9rem;margin-top:.6rem">
+        注：本页演示的是<strong>方案 A（Connect）</strong>的设备接入。因为 Connect 走 WebRTC，媒体必须由浏览器承载，才有这套<strong>信令/媒体分离</strong>的结构。<strong>方案 B（Transcribe）/ 方案 C（Nova Sonic）</strong>的传输本身就是一条 WebSocket，设备可<strong>带票直连推 PCM</strong>、无需媒体分离与观测网页，结构更简单——本演示以文档说明，未单独实现（见 <a href="architecture.html">架构页</a>）。
       </p>
 
       <div class="gw-panel">
@@ -121,7 +124,7 @@
     </div>
 
     <div class="footer">
-      <div class="wrap">Amazon Connect 语音 AI 演示 · voice gateway 抽象 · 沙箱环境 · 仅供方案演示</div>
+      <div class="wrap">Amazon 语音 AI 演示 · voice gateway 抽象 · 沙箱环境 · 仅供方案演示</div>
     </div>
 
     <script type="module" src="gateway.js"></script>

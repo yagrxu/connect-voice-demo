@@ -61,7 +61,7 @@ Check contact attributes（读 Lex 会话属性 Tool）→ Complete → Disconne
 
 | 维度 | 原 demo（Nova Sonic） | 本 demo（Connect） |
 |---|---|---|
-| 语音引擎 | Nova Sonic 端到端 speech-to-speech（要下线） | Connect agentic voice 的 ASR + TTS |
+| 语音引擎 | Nova Sonic 端到端 speech-to-speech | Connect agentic voice 的 ASR + TTS |
 | 对话回合 | 端到端，可自然打断 | agentic voice 支持 barge-in 打断，回合切换 |
 | 大脑 | Nova Sonic 内置 + 本地/远程工具调度 | Connect orchestrator AI agent（托管） |
 | 工具 | 进程内 / AgentCore Action Group | MCP（AgentCore Gateway → Lambda） |

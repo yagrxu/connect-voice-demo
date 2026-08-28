@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>费用估算 · Connect 语音 AI</title>
+  <title>费用估算 · 语音 AI 演示</title>
   <link rel="stylesheet" href="site.css">
   <style>
     .calc { display:grid; grid-template-columns: 1fr 1fr; gap:1.25rem; margin-top:1.5rem; align-items:start; }
@@ -29,11 +29,20 @@
     .bar span { height:100%; }
     .disclaimer { background:#fff7ec; border:1px solid #f3d6a4; border-radius:12px; padding:.9rem 1.1rem; font-size:.86rem; color:#7a5200; margin-top:1.2rem; }
     details.rates { margin-top:1rem; } details.rates summary { cursor:pointer; font-weight:600; font-size:.9rem; color:var(--ink-2); }
+    .impl-tabs { display:flex; gap:.4rem; flex-wrap:wrap; }
+    .impl-tab { font:inherit; font-weight:600; font-size:.85rem; padding:.45rem .8rem; border:1px solid var(--line);
+      border-radius:9px; background:var(--paper); color:var(--ink-2); cursor:pointer; transition:all .15s; }
+    .impl-tab:hover { border-color:var(--orange); color:var(--ink); }
+    .impl-tab.active { background:var(--ink); color:#fff; border-color:var(--ink); }
+    .impl-tab .tag { font-family:var(--mono); font-size:.68rem; opacity:.7; margin-left:.3rem; }
+    .field.dim { opacity:.4; pointer-events:none; }
+    .cmp td.win { color:var(--good); font-weight:700; }
+    .cmp .barcell { padding-top:.2rem; }
   </style>
 </head>
 <body>
   <nav class="nav"><div class="nav-inner">
-    <a class="brand" href="index.html"><span class="spark">◆</span> Connect 语音 AI</a>
+    <a class="brand" href="index.html"><span class="spark">◆</span> 语音 AI 演示</a>
     <div class="nav-links">
       <a href="index.html">演示</a>
       <a href="product.html">产品介绍</a>
@@ -48,13 +57,23 @@
     <div class="eyebrow">Pricing · 月度成本估算</div>
     <h1 class="display">拨一拨，看月度成本。</h1>
     <p class="lead" style="margin-top:.8rem">
-      按你的用量估算这套方案的每月费用。单价均可编辑——请以 <a href="https://aws.amazon.com/connect/pricing/" target="_blank" rel="noopener">AWS 官方定价</a> 与你所在区域为准。此处默认值仅为量级示例。
+      按你的用量估算<strong>三种技术实现</strong>的每月费用：<strong>Connect</strong>（托管组件化）、<strong>Transcribe</strong>（自控三段）、<strong>Nova Sonic</strong>（端到端）。选一个看明细，下方「三方案月度对比」按同一用量同时算出三者。单价均可编辑——请以 <a href="https://aws.amazon.com/connect/pricing/" target="_blank" rel="noopener">AWS 官方定价</a> 与你所在区域为准，默认值仅为量级示例。
     </p>
 
     <div class="calc">
       <!-- inputs -->
       <div class="card">
-        <h3>用量</h3>
+        <h3>技术实现</h3>
+        <div class="field" style="margin-top:.6rem">
+          <div class="impl-tabs">
+            <button type="button" class="impl-tab active" data-impl="connect">Connect<span class="tag">方案 A</span></button>
+            <button type="button" class="impl-tab" data-impl="transcribe">Transcribe<span class="tag">方案 B</span></button>
+            <button type="button" class="impl-tab" data-impl="nova">Nova Sonic<span class="tag">方案 C</span></button>
+          </div>
+          <div class="hint" id="implHint">Connect：托管 agentic voice + Q in Connect（Claude）+ Chime web calling。</div>
+        </div>
+
+        <h3 style="margin-top:1.2rem">用量</h3>
         <div class="field" style="margin-top:.8rem">
           <label>每月对话数 <span class="val" id="vConv">3,000</span></label>
           <input type="range" id="conv" min="100" max="100000" step="100" value="3000">
@@ -65,12 +84,12 @@
           <input type="range" id="mins" min="0.5" max="15" step="0.5" value="2">
           <div class="hint">决定语音（agentic voice）与 web calling 分钟数。</div>
         </div>
-        <div class="field">
+        <div class="field" id="fldTok">
           <label>平均每次对话 LLM tokens <span class="val" id="vTok">4,000</span></label>
           <input type="range" id="tok" min="500" max="40000" step="500" value="4000">
           <div class="hint">AI agent 推理的输入+输出 token（含工具往返）。</div>
         </div>
-        <div class="field">
+        <div class="field" id="fldDev">
           <label>② IoT 设备接入线：常驻设备数 <span class="val" id="vDev">0</span></label>
           <input type="range" id="dev" min="0" max="50" step="1" value="0">
           <div class="hint">第二条线（<code>-c enableGateway</code>）：每台设备一个 7×24 常驻 EC2 进程——<strong>固定月成本</strong>，与对话量无关。设 0＝只用浏览器直连线。</div>
@@ -85,6 +104,11 @@
           <div class="rate"><span class="nm">固定月成本（CloudFront/日志留存等）</span><input type="number" id="rFixed" value="5" step="1"><span class="unit">$/月</span></div>
           <div class="rate"><span class="nm">设备主机（EC2 t3.micro, 7×24）</span><input type="number" id="rEc2" value="7.5" step="0.5"><span class="unit">$/台·月</span></div>
           <div class="rate"><span class="nm">网关基础设施（WebSocket API + DynamoDB）</span><input type="number" id="rGw" value="1.0" step="0.5"><span class="unit">$/台·月</span></div>
+          <div class="rate" style="border-top:1px dashed var(--line);padding-top:.6rem;margin-top:.6rem"><span class="nm">方案 B：Transcribe 流式 ASR</span><input type="number" id="rTranscribe" value="0.024" step="0.001"><span class="unit">$/分钟</span></div>
+          <div class="rate"><span class="nm">方案 B：Polly neural TTS</span><input type="number" id="rPolly" value="0.004" step="0.001"><span class="unit">$/对话</span></div>
+          <div class="rate"><span class="nm">方案 C：Nova Sonic 端到端语音</span><input type="number" id="rNova" value="0.06" step="0.005"><span class="unit">$/分钟</span></div>
+          <div class="rate"><span class="nm">方案 B/C：Fargate 常驻服务（ARM64, 7×24）</span><input type="number" id="rFargate" value="12" step="1"><span class="unit">$/服务·月</span></div>
+          <div class="rate"><span class="nm">方案 B/C：ALB（WSS）</span><input type="number" id="rAlb" value="18" step="1"><span class="unit">$/月</span></div>
         </details>
       </div>
 
@@ -94,20 +118,25 @@
         <div class="total" style="margin-top:.4rem">$<span id="grand">0</span><small>/月</small></div>
         <div class="muted" style="font-size:.86rem; margin-top:.2rem">≈ 单次对话 $<span id="perConv">0</span></div>
         <div class="bar" id="bar" style="margin-top:1rem"></div>
-        <table class="bd">
-          <tr><td>语音自助（agentic voice）</td><td>$<span id="cVoice">0</span></td></tr>
-          <tr><td>Web calling 媒体</td><td>$<span id="cChime">0</span></td></tr>
-          <tr><td>Bedrock 模型（AI agent）</td><td>$<span id="cTok">0</span></td></tr>
-          <tr><td>其它基础设施</td><td>$<span id="cInfra">0</span></td></tr>
-          <tr><td>固定月成本</td><td>$<span id="cFixed">0</span></td></tr>
-          <tr><td>IoT 设备线（EC2+网关，常驻）</td><td>$<span id="cDev">0</span></td></tr>
-          <tr><td>合计</td><td>$<span id="cTotal">0</span></td></tr>
-        </table>
+        <table class="bd"><tbody id="bdRows"></tbody></table>
       </div>
     </div>
 
+    <!-- ============ THREE-WAY COST COMPARISON（始终可见） ============ -->
+    <section style="margin-top:2rem">
+      <div class="eyebrow">Comparison · 三方案月度对比（同一用量）</div>
+      <h2 class="display" style="font-size:1.6rem">同样的用量，三种实现各花多少</h2>
+      <p class="muted" style="font-size:.9rem;margin-top:.4rem">按上方用量与单价实时计算；最低的一档以绿色标出。方案 B/C 的 Fargate/ALB 是<strong>固定月成本</strong>（与对话量无关），低用量时占比高、高用量时被摊薄。</p>
+      <table class="tbl cmp" style="margin-top:1rem">
+        <tr><th style="width:22%">方案</th><th style="width:20%">每月合计</th><th style="width:20%">单次对话</th><th>构成</th></tr>
+        <tr><td><strong>方案 A</strong> · Connect</td><td>$<span id="tA">0</span></td><td>$<span id="pA">0</span></td><td class="barcell"><div class="bar" id="barA"></div></td></tr>
+        <tr><td><strong>方案 B</strong> · Transcribe</td><td>$<span id="tB">0</span></td><td>$<span id="pB">0</span></td><td class="barcell"><div class="bar" id="barB"></div></td></tr>
+        <tr><td><strong>方案 C</strong> · Nova Sonic</td><td>$<span id="tC">0</span></td><td>$<span id="pC">0</span></td><td class="barcell"><div class="bar" id="barC"></div></td></tr>
+      </table>
+    </section>
+
     <div class="disclaimer">
-      ⚠️ <strong>免责声明</strong>：本估算器仅用于量级参考。实际费用取决于 AWS 区域、具体计费模式（如 Connect 按对话/按分钟、Bedrock 输入与输出 token 分别计价、跨区域推理配置等）、承诺折扣与免费额度。第二条线的 EC2 设备主机是 <strong>7×24 固定成本</strong>（与对话量无关），WebSocket API 与 DynamoDB 按用量计费、量级很小，这里合并为“每台·月”近似；不启用第二条线（<code>-c enableGateway</code>）则此项为 0。请以 AWS 官方定价页与实际账单为准。
+      ⚠️ <strong>免责声明</strong>：本估算器仅用于量级参考。实际费用取决于 AWS 区域、具体计费模式（如 Connect 按对话/按分钟、Bedrock 输入与输出 token 分别计价、跨区域推理配置等）、承诺折扣与免费额度。方案 A 第二条线的 EC2 设备主机是 <strong>7×24 固定成本</strong>；方案 B/C 的 <strong>Fargate 常驻服务与 ALB 同样是固定月成本</strong>（与对话量无关，低用量时占比高）。方案 C 的 <strong>Nova Sonic 按语音 token 计费</strong>，这里以“$/分钟”做近似代理，默认值为占位示例，请务必按官方定价校准。请以 AWS 官方定价页与实际账单为准。
     </div>
     <div style="margin-top:1.4rem; display:flex; gap:.8rem; flex-wrap:wrap">
       <a class="btn btn-primary" href="index.html">▶ 打开实时演示</a>
@@ -115,50 +144,93 @@
     </div>
   </div>
 
-  <div class="footer"><div class="wrap">Amazon Connect 语音 AI 演示 · 沙箱环境 · 仅供方案演示</div></div>
+  <div class="footer"><div class="wrap">Amazon 语音 AI 演示 · 沙箱环境 · 仅供方案演示</div></div>
 
   <script>
     const $ = id => document.getElementById(id);
     const fmt = (n, d=2) => n.toLocaleString('en-US', {minimumFractionDigits:d, maximumFractionDigits:d});
-    const colors = ['#0a7d7d','#3b9c9c','#ff9900','#ec7211','#c4bdae','#1f8a4c'];
+    const colors = ['#0a7d7d','#3b9c9c','#ff9900','#ec7211','#c4bdae','#1f8a4c','#6d4bd8'];
+    let impl = 'connect';
+    const IMPL_HINT = {
+      connect: 'Connect：托管 agentic voice + Q in Connect（Claude）+ Chime web calling。',
+      transcribe: 'Transcribe（方案 B）：Transcribe ASR + Bedrock LLM + Polly TTS，跑在 Fargate；Fargate/ALB 为固定月成本。',
+      nova: 'Nova Sonic（方案 C）：端到端语音按分钟近似计费；无独立 LLM token / 设备线；Fargate/ALB 固定月成本。'
+    };
+
+    // Returns [{label, amt, color}] for the chosen pipeline. `u`=usage, `r`=rates.
+    function breakdown(pipeline, u, r) {
+      const min = u.conv * u.mins;
+      if (pipeline === 'transcribe') return [
+        { label: 'Transcribe ASR', amt: min * r.rTranscribe },
+        { label: 'Bedrock LLM（Haiku，可换）', amt: u.conv * u.tok / 1e6 * r.rTok },
+        { label: 'Polly TTS（neural）', amt: u.conv * r.rPolly },
+        { label: 'Fargate 常驻服务（1）', amt: r.rFargate },
+        { label: 'ALB（WSS）', amt: r.rAlb },
+        { label: '其它基础设施（DDB/传输）', amt: u.conv * r.rInfra },
+        { label: '固定月成本', amt: r.rFixed },
+      ];
+      if (pipeline === 'nova') return [
+        { label: 'Nova Sonic 端到端语音', amt: min * r.rNova },
+        { label: 'Fargate 常驻服务（1）', amt: r.rFargate },
+        { label: 'ALB（WSS）', amt: r.rAlb },
+        { label: '其它基础设施（DDB/传输）', amt: u.conv * r.rInfra },
+        { label: '固定月成本', amt: r.rFixed },
+      ];
+      return [ // connect
+        { label: '语音自助（agentic voice）', amt: min * r.rVoice },
+        { label: 'Web calling 媒体', amt: min * r.rChime },
+        { label: 'Bedrock 模型（AI agent）', amt: u.conv * u.tok / 1e6 * r.rTok },
+        { label: '其它基础设施', amt: u.conv * r.rInfra },
+        { label: '固定月成本', amt: r.rFixed },
+        { label: 'IoT 设备线（EC2+网关，常驻）', amt: u.dev * (r.rEc2 + r.rGw) },
+      ];
+    }
+    const sum = rows => rows.reduce((a, x) => a + x.amt, 0);
+    const barHTML = (rows, total) => rows.map((x, i) =>
+      `<span style="width:${total ? (x.amt / total * 100) : 0}%;background:${colors[i % colors.length]}" title="${x.label} $${fmt(x.amt)}"></span>`).join('');
 
     function calc() {
-      const conv = +$('conv').value;
-      const mins = +$('mins').value;
-      const tok  = +$('tok').value;
-      const dev  = +$('dev').value;
-      $('vConv').textContent = conv.toLocaleString();
-      $('vMin').textContent = mins.toFixed(1) + ' 分钟';
-      $('vTok').textContent = tok.toLocaleString();
-      $('vDev').textContent = dev.toLocaleString();
+      const u = { conv:+$('conv').value, mins:+$('mins').value, tok:+$('tok').value, dev:+$('dev').value };
+      $('vConv').textContent = u.conv.toLocaleString();
+      $('vMin').textContent = u.mins.toFixed(1) + ' 分钟';
+      $('vTok').textContent = u.tok.toLocaleString();
+      $('vDev').textContent = u.dev.toLocaleString();
+      const r = {};
+      ['rVoice','rChime','rTok','rInfra','rFixed','rEc2','rGw','rTranscribe','rPolly','rNova','rFargate','rAlb']
+        .forEach(k => r[k] = +$(k).value);
 
-      const rVoice = +$('rVoice').value, rChime = +$('rChime').value,
-            rTok = +$('rTok').value, rInfra = +$('rInfra').value, rFixed = +$('rFixed').value,
-            rEc2 = +$('rEc2').value, rGw = +$('rGw').value;
+      // token slider N/A for nova; device slider only for connect — dim them.
+      $('fldTok').classList.toggle('dim', impl === 'nova');
+      $('fldDev').classList.toggle('dim', impl !== 'connect');
+      $('implHint').textContent = IMPL_HINT[impl];
 
-      const totalMin = conv * mins;
-      const cVoice = totalMin * rVoice;
-      const cChime = totalMin * rChime;
-      const cTok   = conv * tok / 1e6 * rTok;
-      const cInfra = conv * rInfra;
-      const cFixed = rFixed;
-      const cDev   = dev * (rEc2 + rGw); // 7×24 常驻，与对话量无关
-      const total  = cVoice + cChime + cTok + cInfra + cFixed + cDev;
+      // selected pipeline → detailed breakdown
+      const rows = breakdown(impl, u, r);
+      const total = sum(rows);
+      $('bdRows').innerHTML = rows.map(x =>
+        `<tr><td>${x.label}</td><td>$${fmt(x.amt)}</td></tr>`).join('') +
+        `<tr><td>合计</td><td>$${fmt(total)}</td></tr>`;
+      $('grand').textContent = fmt(total, total < 1000 ? 2 : 0);
+      $('perConv').textContent = fmt(u.conv ? total / u.conv : 0, 4);
+      $('bar').innerHTML = barHTML(rows, total);
 
-      $('cVoice').textContent = fmt(cVoice);
-      $('cChime').textContent = fmt(cChime);
-      $('cTok').textContent   = fmt(cTok);
-      $('cInfra').textContent = fmt(cInfra);
-      $('cFixed').textContent = fmt(cFixed);
-      $('cDev').textContent   = fmt(cDev);
-      $('cTotal').textContent = fmt(total);
-      $('grand').textContent  = fmt(total, total < 1000 ? 2 : 0);
-      $('perConv').textContent = fmt(conv ? total / conv : 0, 4);
-
-      const parts = [cVoice, cChime, cTok, cInfra, cFixed, cDev];
-      $('bar').innerHTML = parts.map((p,i) =>
-        `<span style="width:${total? (p/total*100):0}%;background:${colors[i]}"></span>`).join('');
+      // three-way comparison (same usage) — always visible
+      const all = { A: breakdown('connect', u, r), B: breakdown('transcribe', u, r), C: breakdown('nova', u, r) };
+      const totals = { A: sum(all.A), B: sum(all.B), C: sum(all.C) };
+      const min$ = Math.min(totals.A, totals.B, totals.C);
+      [['A','tA','pA','barA'],['B','tB','pB','barB'],['C','tC','pC','barC']].forEach(([k, t, p, b]) => {
+        $(t).textContent = fmt(totals[k], totals[k] < 1000 ? 2 : 0);
+        $(p).textContent = fmt(u.conv ? totals[k] / u.conv : 0, 4);
+        $(b).innerHTML = barHTML(all[k], totals[k]);
+        $(t).parentElement.classList.toggle('win', totals[k] === min$);
+      });
     }
+
+    document.querySelectorAll('.impl-tab').forEach(tab => tab.addEventListener('click', () => {
+      impl = tab.dataset.impl;
+      document.querySelectorAll('.impl-tab').forEach(x => x.classList.toggle('active', x === tab));
+      calc();
+    }));
     document.querySelectorAll('input').forEach(el => el.addEventListener('input', calc));
     calc();
   </script>

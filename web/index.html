@@ -3,12 +3,13 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Connect 语音 AI 演示 · Home</title>
+    <title>语音 AI 演示 · Home</title>
     <link rel="stylesheet" href="site.css">
     <style>
         /* Demo-specific styles (light theme). The element IDs/classes here are
-           consumed by app.js — do not rename: startBtn stopBtn dot stateText
-           phase transcript turn/you/bot/who/txt log. */
+           consumed by app.js — do not rename: pipeline lang startBtn stopBtn dot stateText
+           phase transcript turn/you/bot/who/txt log; stage-latency panel:
+           latency sgTotal stageBar sgAsr sgLlm sgTts sgAsrP sgLlmP sgTtsP sgN. */
         .demo-hero { padding: 3rem 0 1.5rem; }
         .demo-panel {
             display: grid; grid-template-columns: 1.1fr .9fr; gap: 1.25rem;
@@ -36,6 +37,25 @@
         .phase.thinking  { background: #fbeede; color: var(--warn); border-color:#f0d3a8; animation: pulse 1s ease-in-out infinite; }
         .phase.speaking  { background: var(--teal-soft); color: var(--teal); border-color:#b6ddda; }
         @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: .55; } }
+        /* ---- Turn-latency panel (client-side E2E: user stops -> AI speaks) ---- */
+        .latency { border: 1px solid var(--line); border-radius: 12px; background: var(--paper);
+            padding: .75rem .9rem; display: flex; flex-direction: column; gap: .6rem; }
+        .lat-head { display: flex; align-items: baseline; justify-content: space-between; gap: .8rem; }
+        .lat-label { font-size: .82rem; font-weight: 600; color: var(--ink); }
+        .lat-sub { font-family: var(--mono); font-size: .68rem; font-weight: 400; color: var(--muted); }
+        .lat-last { font-family: var(--mono); font-weight: 600; font-size: 1.5rem; color: var(--muted); }
+        .lat-last.good { color: var(--good); } .lat-last.warn { color: var(--warn); } .lat-last.bad { color: #d64545; }
+        .lat-unit { font-size: .8rem; font-weight: 400; color: var(--muted); margin-left: .15rem; }
+        .lat-stats { display: flex; gap: 1.2rem; font-size: .78rem; color: var(--muted); font-family: var(--mono); }
+        .lat-stats b { color: var(--ink); font-weight: 600; }
+        .stage-bar { display: flex; height: 22px; border-radius: 6px; overflow: hidden; background: var(--paper-2); }
+        .stage-bar .seg { display: flex; align-items: center; justify-content: center; min-width: 0;
+            font-family: var(--mono); font-size: .64rem; color: #fff; white-space: nowrap; transition: width .3s; }
+        .stage-bar .seg.asr { background: var(--orange); } .stage-bar .seg.llm { background: var(--teal); } .stage-bar .seg.tts { background: var(--good); }
+        .stage-legend { display: flex; gap: 1rem; font-family: var(--mono); font-size: .78rem; color: var(--muted); }
+        .stage-legend .lg b { color: var(--ink); font-weight: 600; }
+        .stage-legend .lg::before { content: ''; display: inline-block; width: 9px; height: 9px; border-radius: 2px; margin-right: .35rem; vertical-align: middle; }
+        .stage-legend .lg.asr::before { background: var(--orange); } .stage-legend .lg.llm::before { background: var(--teal); } .stage-legend .lg.tts::before { background: var(--good); }
         #transcript {
             background: var(--paper); border: 1px solid var(--line); border-radius: 12px;
             padding: .85rem 1rem; min-height: 8rem; max-height: 42vh; overflow-y: auto;
@@ -62,7 +82,7 @@
 <body>
     <nav class="nav">
       <div class="nav-inner">
-        <a class="brand" href="index.html"><span class="spark">◆</span> Connect 语音 AI</a>
+        <a class="brand" href="index.html"><span class="spark">◆</span> 语音 AI 演示</a>
         <div class="nav-links">
           <a href="index.html" class="active">演示</a>
           <a href="product.html">产品介绍</a>
@@ -87,6 +107,14 @@
       <div class="demo-panel">
         <div class="console">
           <div class="controls">
+            <label for="pipeline" style="font-size:.85rem;color:var(--muted);display:flex;align-items:center;gap:.4rem">
+              方案
+              <select id="pipeline" style="font-family:var(--sans);font-size:.9rem;padding:.45rem .6rem;border:1px solid var(--line);border-radius:8px;background:var(--paper);color:var(--ink)">
+                <option value="connect">Connect</option>
+                <option value="transcribe">Transcribe</option>
+                <option value="nova-sonic">Nova Sonic</option>
+              </select>
+            </label>
             <label for="lang" style="font-size:.85rem;color:var(--muted);display:flex;align-items:center;gap:.4rem">
               语言
               <select id="lang" style="font-family:var(--sans);font-size:.9rem;padding:.45rem .6rem;border:1px solid var(--line);border-radius:8px;background:var(--paper);color:var(--ink)">
@@ -99,6 +127,24 @@
             <span class="status"><span class="dot" id="dot"></span><span id="stateText">idle</span></span>
           </div>
           <div class="phase" id="phase"></div>
+          <div class="latency" id="latency" hidden>
+            <div class="lat-head">
+              <span class="lat-label"><span id="latTitle">回合延迟</span> <span class="lat-sub" id="latSub">从"说完话"开始计时到首个回复音频</span></span>
+              <span class="lat-last" id="sgTotal">—<span class="lat-unit">ms</span></span>
+            </div>
+            <div class="stage-bar" id="stageBar"></div>
+            <div class="stage-legend" id="stageLegend">
+              <span class="lg asr">ASR <b id="sgAsr">—</b></span>
+              <span class="lg llm">LLM <b id="sgLlm">—</b></span>
+              <span class="lg tts">TTS <b id="sgTts">—</b></span>
+            </div>
+            <div class="lat-stats" id="latStats">
+              <span>中位 ASR <b id="sgAsrP">—</b></span>
+              <span>LLM <b id="sgLlmP">—</b></span>
+              <span>TTS <b id="sgTtsP">—</b></span>
+              <span>回合 <b id="sgN">0</b></span>
+            </div>
+          </div>
           <div id="transcript"></div>
           <div id="log"></div>
         </div>
@@ -114,12 +160,19 @@
             <p class="muted" style="font-size:.85rem; margin-top:.8rem">
               建议使用 Chrome / Edge / Firefox，并允许麦克风权限。首次接通约 3–4 秒（Connect 建立会话），期间显示“连接中”。
             </p>
+            <p class="muted" style="font-size:.85rem; margin-top:.4rem">
+              <strong>方案</strong>：Connect（现有 agentic voice）· Transcribe（方案 B · 自控三段，可显示 ASR/LLM/TTS 精确分段）· Nova Sonic（方案 B · 端到端语音，无法切分单段，仅显示总延迟）。三方案共用同一延迟面板，延迟均从"说完话"开始计时，便于横向对比。
+            </p>
           </div>
           <div class="card accent">
             <h3>状态指示怎么读</h3>
             <p class="muted" style="font-size:.9rem; margin-top:.4rem">
               ⏳ 连接中 · 🎙️ 正在听你说 · 💭 思考中（已听到、正在推理）· 🔊 正在回答。<br>
               状态由麦克风/扬声器音量实时推断，字幕几秒内从 Connect 日志补齐。
+            </p>
+            <p class="muted" style="font-size:.85rem; margin-top:.6rem">
+              <strong>回合分段延迟</strong>：<span style="color:var(--teal)">LLM</span> 取自 Connect 日志时间戳（精确）；<span style="color:var(--orange-deep)">ASR</span>、<span style="color:var(--good)">TTS</span>
+              由"客户端音频边界 − 日志时间戳"反推，为 ≈ 估算（±100–200ms，含时钟偏移，忽略传输）。原理见 <code>docs/latency.md</code>。日志摄取滞后数秒，故面板比语音慢几秒出现。
             </p>
           </div>
           <div class="card" style="border-top:3px solid #1f8a4c">
@@ -135,7 +188,7 @@
     </div>
 
     <div class="footer">
-      <div class="wrap">Amazon Connect 语音 AI 演示 · 沙箱环境 · 仅供方案演示</div>
+      <div class="wrap">Amazon 语音 AI 演示 · 沙箱环境 · 仅供方案演示</div>
     </div>
 
     <!-- Amazon Chime SDK for JavaScript is imported as an ES module inside

@@ -3,3 +3,10 @@ cdk.out/
 __pycache__/
 *.pyc
 .DS_Store
+.omni/
+.claude/
+.github/
+.cursor/
+.kiro/
+.agents/
+.env.omni

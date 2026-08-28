@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>产品介绍 · Connect 语音 AI</title>
+  <title>产品介绍 · 语音 AI 演示</title>
   <link rel="stylesheet" href="site.css">
   <style>
     .hero { padding: 3.5rem 0 1rem; }
@@ -15,11 +15,20 @@
     .flow-strip { display:flex; align-items:center; gap:.6rem; flex-wrap:wrap; margin: 1.4rem 0 0; }
     .flow-strip .node { background:var(--card); border:1px solid var(--line); border-radius:10px; padding:.5rem .8rem; font-size:.85rem; font-weight:600; box-shadow: var(--shadow); }
     .flow-strip .arrow { color: var(--orange-deep); font-weight:700; }
+    .impl-tabs { display:flex; gap:.5rem; flex-wrap:wrap; margin:1.6rem 0 .4rem; }
+    .impl-tab { font:inherit; font-weight:600; font-size:.9rem; padding:.55rem 1.05rem; border:1px solid var(--line);
+      border-radius:10px; background:var(--card); color:var(--ink-2); cursor:pointer; box-shadow:var(--shadow); transition:all .15s; }
+    .impl-tab:hover { border-color:var(--orange); color:var(--ink); }
+    .impl-tab.active { background:var(--ink); color:#fff; border-color:var(--ink); }
+    .impl-tab .tag { font-family:var(--mono); font-size:.7rem; opacity:.7; margin-left:.35rem; }
+    .impl-hint { font-size:.83rem; color:var(--muted); margin:.2rem 0 .4rem; }
+    [data-impl-panel] { display:none; }
+    [data-impl-panel].active { display:block; }
   </style>
 </head>
 <body>
   <nav class="nav"><div class="nav-inner">
-    <a class="brand" href="index.html"><span class="spark">◆</span> Connect 语音 AI</a>
+    <a class="brand" href="index.html"><span class="spark">◆</span> 语音 AI 演示</a>
     <div class="nav-links">
       <a href="index.html">演示</a>
       <a href="product.html" class="active">产品介绍</a>
@@ -35,6 +44,9 @@
     <h1 class="display">把语音 AI 助手，<br>建在 Amazon Connect 之上。</h1>
     <p class="lead" style="margin-top:1rem">
       语音 AI 助手常见做法是用一个 <strong>voice-to-voice 模型</strong>（如 Amazon Nova 2 Sonic）端到端处理语音进、语音出。本方案改用 <strong>Amazon Connect</strong> 的原生 agentic 能力做出同等语音体验，并把它抽象成<strong>两条接入线</strong>：①浏览器直接说话；②真实 <strong>IoT 设备</strong>经 <strong>voice gateway</strong> 鉴权接入——贴近客户实际链路。两条线共用同一套 Connect 后端：语音识别与合成、AI agent 推理与工具调用，全部组件化、可托管、可编排。
+    </p>
+    <p class="lead" style="margin-top:.8rem; font-size:1rem">
+      针对<strong>低延迟</strong>与<strong>逐段可测量</strong>的诉求，我们进一步做了<strong>三种技术实现</strong>并可在演示页一键切换对比：<strong>Connect</strong>（托管组件化）、<strong>Transcribe</strong>（自控三段流式，可精确计时）、<strong>Nova Sonic</strong>（端到端语音，最低延迟）。见下方「三种技术实现」。
     </p>
     <div class="flow-strip">
       <span class="node">🎙️ 浏览器语音</span><span class="arrow">→</span>
@@ -61,8 +73,61 @@
     </div>
   </div>
 
+  <!-- ============ THREE IMPLEMENTATIONS ============ -->
   <section class="wrap">
-    <div class="eyebrow">Capabilities · 核心能力</div>
+    <div class="eyebrow">Implementations · 三种技术实现</div>
+    <h2 class="display">同一个演示，三条可切换、可对比的语音管线</h2>
+    <p class="lead" style="margin-top:.6rem">
+      演示页顶部的「方案」下拉可切换三种实现，共用同一套前端与延迟面板。<strong>方案 A（Connect）</strong>是托管组件化路线；<strong>方案 B（Transcribe）</strong>与<strong>方案 C（Nova Sonic）</strong>是我们为压低延迟、并能<strong>逐段计时/换模型</strong>而自建的两条流式管线，跑在 ECS Fargate 上、不经 Connect。此对比区块始终可见，下方按<strong>方案切换</strong>看各自的产品要点。
+    </p>
+    <div class="grid grid-3" style="margin-top:1.4rem">
+      <div class="card"><div class="ic" style="background:var(--teal-soft);color:var(--teal)">🅰️</div>
+        <h3>Connect（方案 A）</h3>
+        <p class="muted">托管 <strong>agentic voice</strong>（ASR+TTS）+ Q in Connect <strong>orchestrator</strong>（Claude）+ MCP 工具。组件化、可托管、可编排，自带安全/日志/合规入口。<br>
+        <span style="color:var(--muted)">回合制；黑盒无法逐段计时；端到端 ≈ 3–4s。</span></p></div>
+      <div class="card"><div class="ic" style="background:#fff4e0;color:var(--orange-deep)">🅱️</div>
+        <h3>Transcribe（方案 B）</h3>
+        <p class="muted">自控三段流式：<strong>Amazon Transcribe</strong>(ASR) → <strong>Bedrock Converse</strong>(Claude Haiku，可换) → <strong>Amazon Polly</strong>(TTS)。服务端亲自串联，<strong>精确切分 ASR/LLM/TTS</strong>。<br>
+        <span style="color:var(--muted)">便于选模型/逐段定位；端到端 ≈ 2.3s（LLM 主导）。</span></p></div>
+      <div class="card"><div class="ic" style="background:#efe9fb;color:#6d4bd8">🅱️</div>
+        <h3>Nova Sonic（方案 C）</h3>
+        <p class="muted">端到端语音：<strong>Bedrock Nova 2 Sonic</strong> 双向流，识别/推理/合成一体（<code>InvokeModelWithBidirectionalStream</code>）。<br>
+        <span style="color:var(--muted)"><strong>最低延迟 ≈ 1.4s</strong>；不可切分单段，仅报端到端总延迟。</span></p></div>
+    </div>
+
+    <table class="tbl" style="margin-top:1.4rem">
+      <tr>
+        <th style="width:16%">维度</th>
+        <th style="width:28%">Connect（方案 A）</th>
+        <th style="width:28%">Transcribe（方案 B）</th>
+        <th style="width:28%">Nova Sonic（方案 C）</th>
+      </tr>
+      <tr><td>语音处理</td><td>组件化（托管 ASR+LLM+TTS）</td><td>组件化（自控三段流式）</td><td>端到端一体（S2S）</td></tr>
+      <tr><td>端到端延迟</td><td>≈ 3–4s</td><td>≈ 2.3s</td><td><strong>≈ 1.4s（最低）</strong></td></tr>
+      <tr><td>逐段计时</td><td>✗ 黑盒（仅 ≈ 估算，滞后数秒）</td><td><strong>✓ 精确</strong> ASR / LLM / TTS</td><td>△ 仅端到端总延迟</td></tr>
+      <tr><td>换模型 / 调试</td><td>受限（托管编排）</td><td><strong>✓</strong> 可换 LLM、逐段定位瓶颈</td><td>✗ 一体模型，不可拆</td></tr>
+      <tr><td>打断 / 回声</td><td>agentic voice barge-in</td><td>客户端半双工静音防回声</td><td>模型内置端点/回合</td></tr>
+      <tr><td>运维</td><td>Connect 托管</td><td>自运维 ECS Fargate（ARM64）</td><td>自运维 ECS Fargate（ARM64）</td></tr>
+      <tr><td>计时锚点</td><td colspan="3">三者统一：从「说完话」计到首个回复音频——不含说话时长，可直接横向对比</td></tr>
+      <tr><td>适用</td><td>需要 Connect 生态 / 电话 / 坐席</td><td>需要选模型与逐段调试</td><td>追求最低延迟的自然语音对话</td></tr>
+    </table>
+    <p class="muted" style="margin-top:1rem; font-size:.9rem">
+      架构与逐步数据流见 <a href="architecture.html">架构页</a>（三种实现各有独立的场景数据流）；部署与踩坑见 <a href="deployment.html">部署与调优</a>。
+    </p>
+  </section>
+
+  <!-- implementation selector -->
+  <div class="wrap" style="padding-top:0">
+    <div class="impl-tabs" role="tablist">
+      <button class="impl-tab active" data-impl="connect">Connect<span class="tag">方案 A</span></button>
+      <button class="impl-tab" data-impl="transcribe">Transcribe<span class="tag">方案 B</span></button>
+      <button class="impl-tab" data-impl="nova">Nova Sonic<span class="tag">方案 C</span></button>
+    </div>
+    <p class="impl-hint" id="implHint">下面展示 <b>方案 A（Connect）</b> 的核心能力与呼叫编排。上方对比与路线取舍始终可见。</p>
+  </div>
+
+  <section class="wrap" data-impl-panel="connect">
+    <div class="eyebrow">Capabilities · 核心能力（方案 A · Connect）</div>
     <h2 class="display">拼在一起，就是一个语音 AI</h2>
     <div class="grid grid-3" style="margin-top:1.4rem">
       <div class="card"><div class="ic">🎙️</div><h3>浏览器语音入口</h3><p class="muted">通过 Connect web calling（WebRTC）+ Amazon Chime SDK，网页点一下即可通话，无需电话号码、无需安装客户端。</p></div>
@@ -76,9 +141,9 @@
   </section>
 
   <section class="wrap">
-    <div class="eyebrow">Comparison · 两类语音 AI 方案对比</div>
+    <div class="eyebrow">Comparison · 两类语音 AI 方案对比（路线取舍）</div>
     <h2 class="display">Voice-to-voice 模型 vs Connect 组件化</h2>
-    <p class="lead" style="margin-top:.4rem; font-size:1rem">同样是“语音进、语音出 + 会调工具的 AI 助手”，两条实现路线的取舍。</p>
+    <p class="lead" style="margin-top:.4rem; font-size:1rem">同样是“语音进、语音出 + 会调工具的 AI 助手”，两条实现路线的取舍。本演示<strong>两条路线都落地了</strong>：Connect 组件化＝方案 A；voice-to-voice＝方案 C 的 Nova Sonic（另有方案 B · Transcribe 作为“自控组件化”的低延迟折中）。上方「三种技术实现」是三者的横向数据对比，本节讲的是背后的<strong>路线哲学</strong>。</p>
     <table class="tbl" style="margin-top:1.2rem">
       <tr><th style="width:16%">维度</th><th>Voice-to-voice 模型方案（如 Amazon Nova 2 Sonic）</th><th>本方案（Amazon Connect 组件化）</th></tr>
       <tr><td>语音引擎</td><td>单一模型端到端 speech-to-speech</td><td>Connect <strong>agentic voice</strong> 的 ASR + TTS（可托管、50+ 语言/嗓音）</td></tr>
@@ -93,8 +158,8 @@
     </p>
   </section>
 
-  <section class="wrap">
-    <div class="eyebrow">Contact Flow · 呼叫编排脚本</div>
+  <section class="wrap" data-impl-panel="connect">
+    <div class="eyebrow">Contact Flow · 呼叫编排脚本（方案 A · Connect）</div>
     <h2 class="display">Flow：把语音、会话与 AI 串起来的编排</h2>
     <p class="lead" style="margin-top:.6rem">
       <strong>Contact Flow</strong> 是 Amazon Connect 的可视化编排（本质是一个状态机）——每一通接入的联系（这里是浏览器 web call）都会“走”一遍这个 flow，按块（block）顺序被处理。它决定了：用什么嗓音、什么时候建立 AI 会话、把话交给谁、以及出错/结束怎么走。我们这个 demo 的 flow 只有 5 个块，却把整条语音 AI 链路串了起来。
@@ -141,7 +206,49 @@
     </div>
   </section>
 
-  <div class="footer"><div class="wrap">Amazon Connect 语音 AI 演示 · 沙箱环境 · 仅供方案演示</div></div>
+  <!-- ===== 方案 B · Transcribe 产品要点 ===== -->
+  <section class="wrap" data-impl-panel="transcribe">
+    <div class="eyebrow">Capabilities · 产品要点（方案 B · Transcribe）</div>
+    <h2 class="display">自控三段：可精确计时、可换模型</h2>
+    <p class="lead" style="margin-top:.6rem">
+      方案 B 不经 Connect，由我们的 Fargate 服务亲自把 <strong>Amazon Transcribe（ASR）→ Bedrock Converse（LLM）→ Amazon Polly（TTS）</strong> 串起来，因此每一段都能<strong>精确计时</strong>，也能自由更换 LLM 与嗓音。
+    </p>
+    <div class="grid grid-3" style="margin-top:1.4rem">
+      <div class="card"><div class="ic">📊</div><h3>逐段精确计时</h3><p class="muted">服务端记录 ASR / LLM / TTS 时间戳写入 DynamoDB，延迟面板实时显示三段——便于定位瓶颈、比较模型。</p></div>
+      <div class="card"><div class="ic">🔁</div><h3>可换模型</h3><p class="muted">LLM 走 Bedrock Converse（默认 Claude Haiku，可换任意 Bedrock 模型）；TTS 走 Polly neural（多语言/嗓音）。</p></div>
+      <div class="card"><div class="ic">🎯</div><h3>自控端点检测</h3><p class="muted">webrtcvad + 双条件（音频静音且 Transcribe 停更）判定“说完话”，兼顾不拆句、不截断。</p></div>
+      <div class="card"><div class="ic">⚡</div><h3>端到端 ≈ 2.3s</h3><p class="muted">主要由 LLM 决定；ASR/TTS 各百毫秒级。计时从“说完话”起算，不含说话时长。</p></div>
+      <div class="card"><div class="ic">🧱</div><h3>ECS Fargate（ARM64）</h3><p class="muted">浏览器 WebSocket 直连 ALB → Fargate；镜像用 podman 构建、Graviton 运行，更省。</p></div>
+      <div class="card" style="border-top:3px solid #1f8a4c"><div class="ic" style="background:#eaf6ee;color:#1f8a4c">📟</div><h3>IoT 设备接入更简单</h3><p class="muted">传输就是一条 WSS：设备带票直连推 PCM，无信令/媒体分离。本演示以文档说明，未单独实现。</p></div>
+    </div>
+    <div style="margin-top:1.6rem; display:flex; gap:.8rem; flex-wrap:wrap">
+      <a class="btn btn-primary" href="index.html">▶ 打开实时演示（选 Transcribe）</a>
+      <a class="btn btn-ghost" href="architecture.html">看方案 B 架构与数据流</a>
+    </div>
+  </section>
+
+  <!-- ===== 方案 C · Nova Sonic 产品要点 ===== -->
+  <section class="wrap" data-impl-panel="nova">
+    <div class="eyebrow">Capabilities · 产品要点（方案 C · Nova Sonic）</div>
+    <h2 class="display">端到端语音：最低延迟、最自然</h2>
+    <p class="lead" style="margin-top:.6rem">
+      方案 C 用 <strong>Bedrock Nova 2 Sonic</strong> 一条双向流完成识别/推理/合成（<code>InvokeModelWithBidirectionalStream</code>）。延迟最低、对话最自然，代价是<strong>不可切分单段</strong>，只报端到端总延迟。
+    </p>
+    <div class="grid grid-3" style="margin-top:1.4rem">
+      <div class="card"><div class="ic">🚀</div><h3>端到端 ≈ 1.4s</h3><p class="muted">三种实现里最快，约为方案 B 的一半、方案 A 的三分之一。适合追求自然口语交互的场景。</p></div>
+      <div class="card"><div class="ic">🎙️</div><h3>一体模型</h3><p class="muted">ASR/LLM/TTS 都在模型内部；自带端点与回合判定，无需外部 VAD。支持工具调用（toolUse）。</p></div>
+      <div class="card"><div class="ic">🧩</div><h3>仅端到端计时</h3><p class="muted">无法拆分单段——面板显示端到端总延迟（从“说完话”到首个回复音频），与 A/B 同锚点可对比。</p></div>
+      <div class="card"><div class="ic">🧱</div><h3>ECS Fargate（ARM64）</h3><p class="muted">与方案 B 共用 ALB，走 <code>/ws/nova</code> 路径；因 awscrt 版本冲突，独立镜像/服务。</p></div>
+      <div class="card"><div class="ic">🔧</div><h3>MCP/工具一致</h3><p class="muted">复用同一套工具（get_current_time / get_weather），promptStart 下发工具配置（schema 需为 JSON 字符串）。</p></div>
+      <div class="card" style="border-top:3px solid #1f8a4c"><div class="ic" style="background:#eaf6ee;color:#1f8a4c">📟</div><h3>IoT 设备接入更简单</h3><p class="muted">同方案 B：设备带票直连 WSS 推 PCM，无信令/媒体分离。本演示以文档说明，未单独实现。</p></div>
+    </div>
+    <div style="margin-top:1.6rem; display:flex; gap:.8rem; flex-wrap:wrap">
+      <a class="btn btn-primary" href="index.html">▶ 打开实时演示（选 Nova Sonic）</a>
+      <a class="btn btn-ghost" href="architecture.html">看方案 C 架构与数据流</a>
+    </div>
+  </section>
+
+  <div class="footer"><div class="wrap">Amazon 语音 AI 演示 · 沙箱环境 · 仅供方案演示</div></div>
 
   <style>
     .fblock { background:var(--card); border:1px solid var(--line); border-radius:9px; padding:.5rem .8rem;
@@ -149,5 +256,25 @@
     .fblock.hi { border-color:var(--orange); box-shadow:0 0 0 2px rgba(255,153,0,.18), var(--shadow); }
     .farrow { color:var(--orange-deep); font-weight:700; }
   </style>
+
+  <script>
+    (function () {
+      const HINT = {
+        connect: '下面展示 <b>方案 A（Connect）</b> 的核心能力与呼叫编排。上方对比与路线取舍始终可见。',
+        transcribe: '下面展示 <b>方案 B（Transcribe）</b> 的产品要点。上方对比与路线取舍始终可见。',
+        nova: '下面展示 <b>方案 C（Nova Sonic）</b> 的产品要点。上方对比与路线取舍始终可见。'
+      };
+      const tabs = document.querySelectorAll('.impl-tab');
+      const panels = document.querySelectorAll('[data-impl-panel]');
+      const hint = document.getElementById('implHint');
+      function sel(k) {
+        tabs.forEach(t => t.classList.toggle('active', t.dataset.impl === k));
+        panels.forEach(p => p.classList.toggle('active', p.dataset.implPanel.split(' ').includes(k)));
+        if (hint && HINT[k]) hint.innerHTML = HINT[k];
+      }
+      tabs.forEach(t => t.addEventListener('click', () => sel(t.dataset.impl)));
+      sel('connect');
+    })();
+  </script>
 </body>
 </html>
