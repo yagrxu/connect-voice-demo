@@ -1,6 +1,8 @@
 # 架构说明
 
-## 时序（浏览器一次语音对话）
+> 本文档描述**方案 A（Amazon Connect）**的时序与组件。方案 B（Transcribe 自控三段流式）与方案 C（Nova Sonic 端到端 S2S）的架构见网页 `web/architecture.html`（可切三方案对比）与 [`latency-optimization-plan.md`](latency-optimization-plan.md)。
+
+## 时序（浏览器一次语音对话 · 方案 A）
 
 ```
 浏览器 (打开 CloudFront URL) ── 唯一公网入口就是 CloudFront ──┐

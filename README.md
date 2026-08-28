@@ -1,17 +1,18 @@
-# Amazon Connect 语音 AI 演示
+# 语音 AI 演示 · 三方案对比（Connect / Transcribe / Nova Sonic）
 
-一个在浏览器里用语音和 AI 对话的演示，跑在 **Amazon Connect** 上。你打开网页、点 Start、对着麦克风说话，它会语音回复，并在需要时调用两个简单工具（`get_current_time`、`get_weather`）。
+一个在浏览器里用语音和 AI 对话的演示：打开网页、点 Start、对着麦克风说话，它会语音回复，并在需要时调用两个简单工具（`get_current_time`、`get_weather`）。
 
-这是 [`../chatbot-demo`](../chatbot-demo)（基于 **Amazon Nova Sonic**）的 Connect 版对等实现。本版本演示用 **Amazon Connect 的原生能力**（agentic voice）实现同等体验，作为 Nova Sonic 端到端方案的一个替代对照，**完全不依赖 Nova Sonic**：
+**这不再是 Connect-only 的 demo。** 同一套前端与延迟面板下，提供**三种可切换、可横向对比**的技术实现：
 
-- **接入**：浏览器 web calling（WebRTC），和原 demo 一样是「网页 + 麦克风语音流」，**不需要电话号码**。
-- **语音**：Connect **agentic voice** 的 ASR + TTS（富有表现力、支持打断），**不使用 Nova Sonic Speech-to-Speech**。
-- **大脑**：Connect **orchestrator AI agent**（托管的多步推理 + 判断调哪个工具），我们不用自己写 Bedrock 调用循环。
-- **工具**：我们的 Lambda，通过 **AgentCore Gateway 暴露为 MCP 工具**。
+- **方案 A · Connect**：用 **Amazon Connect** 原生能力——agentic voice 做 ASR+TTS、orchestrator AI agent 做大脑、工具经 **AgentCore Gateway** 暴露为 **MCP**。托管黑盒，拿不到分段边界，只能测端到端延迟（≈3–4s）。
+- **方案 B · Transcribe**：**自控三段流式管线**——浏览器 WSS 上行 16k PCM，ECS Fargate 服务串起 **Amazon Transcribe（ASR）→ Bedrock Converse（Claude Haiku，LLM）→ Amazon Polly（TTS）**，可**精确切分**计时 ASR/LLM/TTS（≈2.3s，LLM 主导）。
+- **方案 C · Nova Sonic**：**端到端语音（S2S）**——同一前端连到另一个 Fargate 服务，调用 **Bedrock Nova 2 Sonic** 双向流，识别/推理/合成一体完成，延迟最低（≈1.4s），不可切分单段。
 
-> 原 demo 的「智能猫咪照护」人设在这里刻意去掉了——本 demo 就是一个朴素的通用语音助手，只有报时间和报天气两个工具，保持最简。
+方案 B/C 不经 Connect，共用同一套 **ECS Fargate（ARM64）+ ALB(WSS)** 流式基建，按路径路由（`/ws/session`→B、`/ws/nova`→C），每回合时间戳写 DynamoDB 供延迟面板做横向对比。
 
-## 架构一览
+> 三方案计时锚点统一：都从「说完话」起算到首个回复音频，不含说话时长，可公平对比。姊妹实现见 [`../chatbot-demo`](../chatbot-demo)（纯 Nova Sonic）。人设刻意去掉——就是个朴素的通用语音助手，只有报时间和报天气两个工具，保持最简。
+
+## 架构一览（方案 A · Connect）
 
 ```
 浏览器(Start) → web 后端 Lambda(StartWebRTCContact) → Connect 实例
@@ -21,7 +22,7 @@
         → agentic voice 播报 → 回浏览器
 ```
 
-详见 [`docs/architecture.md`](docs/architecture.md)。
+方案 B/C 的自控流式架构（前端→ALB→两个 Fargate 服务→AWS 托管 AI）见网页 `web/architecture.html`（顶部「方案」标签可切三方案，图会高亮当前所选管线）与 [`docs/latency-optimization-plan.md`](docs/latency-optimization-plan.md)。方案 A 时序详见 [`docs/architecture.md`](docs/architecture.md)。
 
 ## 前置条件
 
@@ -47,6 +48,17 @@ npm run deploy
 
 > **几乎全链路 CDK 化。** 仅剩两件运行时小事（CFN 无法在部署期完成）：Gateway 的 **JWT 入站授权**（已 CDK 化，两轮部署）；以及 JWT 就绪后在控制台**把 MCP 工具挂到 AI agent** + bot 上启用 agentic voice。详见 [`docs/console-setup.md`](docs/console-setup.md)。
 > 若复用已存在的 Connect 实例（避免账号实例配额）：追加 `-c instanceId=<你的实例 id>`。
+
+### 方案 B/C：流式后端（可选，与 Connect 栈隔离）
+
+方案 B/C 是独立的 `ConnectVoiceDemoStreamingStack`（`lib/streaming-stack.js`），用 `-c enableStreaming=true` 单独开启，**不依赖 Connect / Lex / Wisdom**。镜像用 **podman** 构建（Docker Desktop 被 org 登录门槛挡住）：
+
+```bash
+CDK_DOCKER=podman npx cdk deploy ConnectVoiceDemoStreamingStack \
+  -c enableStreaming=true --require-approval never
+```
+
+会建好：**两个 ARM64 Fargate 服务**（服务①Transcribe 管线挂 `/ws/session`、服务②Nova Sonic 挂 `/ws/nova`，因 `awscrt` 版本冲突必须拆开）、共用 **ALB(WSS)** 按路径路由、DynamoDB `turn-timings`（每回合时间戳）。前置：Bedrock 控制台开通 **Claude Haiku** 与 **Nova 2 Sonic** 访问。
 
 ## 第二条线：IoT 设备接入语音网关（可选）
 
@@ -87,15 +99,16 @@ npm run synth     # CDK 合成，验证模板无误
 
 | 路径 | 作用 |
 | --- | --- |
-| `bin/app.js` | CDK 入口，单 stack，默认 `us-west-2` |
-| `lib/connect-demo-stack.js` | 全部基建：工具 Lambda、AgentCore Gateway(MCP)、Connect 实例、web 后端；CloudFront（唯一入口）→ S3 静态站 + API Gateway |
+| `bin/app.js` | CDK 入口，默认 `us-west-2`；实例化 Connect 主栈，`-c enableStreaming=true` 时追加流式栈 |
+| `lib/connect-demo-stack.js` | 方案 A 全部基建：工具 Lambda、AgentCore Gateway(MCP)、Connect 实例、web 后端；CloudFront（唯一入口）→ S3 静态站 + API Gateway |
+| `lib/streaming-stack.js` | 方案 B/C 流式栈：VPC、两个 ECS Fargate 服务（ARM64）、共用 ALB(WSS) 按路径路由、DynamoDB `turn-timings` |
 | `lambda/tools/tools.py` | 两个工具的纯函数（复用自原 demo，确定性、无外部 API） |
 | `lambda/tools/handler.py` | MCP 工具入口，按工具名路由 |
 | `lambda/webcall/handler.js` | 发起 web call（`StartWebRTCContact`），经 API Gateway 暴露；含 `/issue-ticket` `/gw-config` |
 | `lambda/gateway/` | voice gateway 的 WebSocket Lambda（`handler.js`）+ 移植的验票纯函数（`auth.js`）—— 仅 `-c enableGateway=true` 时部署 |
 | `device/device.js` | EC2 上模拟的 IoT 设备进程（拿票 → WS 长连接 → 起会话）；零依赖，Node 22 全局 `fetch`/`WebSocket` |
-| `web/` | 浏览器页面（托管在 S3，经 CloudFront）：Start/Stop + Amazon Chime SDK WebRTC；`gateway.html` 是 IoT 线观测台；`stream.js` 是方案 B 流式客户端 |
-| `streaming-backend/` | 方案 B 自控流式管线后端（Python：Transcribe+Bedrock+Polly，AgentCore Runtime）——**脚手架，未部署**，见 [`docs/latency-optimization-plan.md`](docs/latency-optimization-plan.md) |
+| `web/` | 浏览器页面（托管在 S3，经 CloudFront）：Start/Stop + Amazon Chime SDK WebRTC；`gateway.html` 是 IoT 线观测台；`stream.js` 是方案 B/C 流式客户端（WSS + AudioWorklet） |
+| `streaming-backend/` | 方案 B/C 自控流式后端（Python）：`transcribe_pipeline.py`（Transcribe+Bedrock+Polly，方案 B）与 `nova_*` / `nova/`（Nova Sonic S2S，方案 C）；由 `lib/streaming-stack.js` 部署为两个 Fargate 服务。见 [`docs/latency-optimization-plan.md`](docs/latency-optimization-plan.md) |
 | `flows/agentic-voice-flow.json` | 可导入的 Contact Flow 定义 |
 | `prompts/orchestration-prompt.md` | AI agent 的 orchestration prompt |
 | `docs/` | 架构说明 + 控制台补充步骤 + [延迟丈量与模型选型](docs/latency.md) + [延迟优化方案(两条路)](docs/latency-optimization-plan.md) |
@@ -113,5 +126,5 @@ npm run destroy
 - 电话号码 / PSTN 接入（本 demo 只走浏览器 web calling）。
 - 真实天气 API（`get_weather` 返回确定性模拟数据，可离线演示）。
 - 转人工队列的完整实现（flow 里预留了 `Escalate` 路由，但没接真实 agent）。
-- **ASR/LLM/TTS 分段延迟丈量**——三段由 Connect agentic voice 托管，拿不到分段边界事件；只能测端到端回合延迟。详见 [`docs/latency.md`](docs/latency.md)。
+- **方案 A 的 ASR/LLM/TTS 分段延迟丈量**——三段由 Connect agentic voice 托管，拿不到分段边界事件，只能测端到端回合延迟（**方案 B 可精确切分**，方案 C 端到端 S2S 同样不可切分）。详见 [`docs/latency.md`](docs/latency.md)。
 - AI agent 的 MCP **工具挂载**（运行时依赖：需 JWT 就绪后在控制台完成，见 `docs/console-setup.md` 第 3 节）。其余全链路——工具、Gateway+MCP 注册、JWT 授权、Lex bot、Contact Flow、web calling、AI agent/prompt/assistant/security profile——均已 CDK 自动化并实机验证。
