@@ -24,7 +24,8 @@ const TOKEN_SECRET = process.env.TOKEN_SECRET || ''; // set only when the gatewa
 // it. Inlined here (not require()'d) because this Lambda's asset packages only
 // lambda/webcall/. See lambda/gateway/auth.js for the canonical copy + rationale.
 function signToken(deviceId) {
-  const payload = { sub: deviceId, scope: 'voice-stream', iss: 'iot-core-demo', iat: 1700000000, exp: 1700003600 };
+  const iat = Math.floor(Date.now() / 1000);
+  const payload = { sub: deviceId, scope: 'voice-stream', iss: 'iot-core-demo', iat, exp: iat + 3600 };
   const body = Buffer.from(JSON.stringify(payload)).toString('base64url');
   const sig = crypto.createHmac('sha256', TOKEN_SECRET).update(body).digest('base64url');
   return `${body}.${sig}`;

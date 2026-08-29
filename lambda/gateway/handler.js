@@ -118,19 +118,29 @@ async function broadcast(client, deviceId, payload, roleFilter) {
 async function onConnect(event) {
   const qs = event.queryStringParameters || {};
   const role = qs.role === 'observer' ? 'observer' : 'device';
-  const deviceId = qs.deviceId || 'speaker-001';
   const connectionId = event.requestContext.connectionId;
 
   let steps = [];
+  let deviceId;
   if (role === 'device') {
-    // Devices MUST present a valid ticket. Observers connect without one (they
-    // are a trusted local peripheral — the mic/screen — not the authed party).
+    // Devices MUST present a valid ticket. The AUTHORITATIVE device identity is
+    // the ticket's verified `sub` — NEVER the spoofable query string. A holder
+    // of device-A's ticket must not be able to register as device-B by passing
+    // ?deviceId=B; if a deviceId is supplied it must match the ticket.
     const v = verifyToken(qs.ticket);
     steps = v.steps;
     if (!v.ok) {
       return { statusCode: 401, body: 'invalid device ticket' };
     }
+    deviceId = v.claims.sub;
+    if (qs.deviceId && qs.deviceId !== deviceId) {
+      return { statusCode: 403, body: 'deviceId does not match ticket' };
+    }
+    steps = [...steps, `connection bound to ticket identity sub=${deviceId}`];
   } else {
+    // Observers connect without a ticket (a trusted local peripheral — the
+    // mic/screen — not the authed party). They pair to a device by deviceId.
+    deviceId = qs.deviceId || 'speaker-001';
     steps = ['observer connected (no device ticket required)'];
   }
 

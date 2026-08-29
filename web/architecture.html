@@ -694,7 +694,7 @@
       </svg>
     </div>
     <div class="grid grid-3" style="margin-top:1.2rem">
-      <div class="card"><h3>设备 → 网关</h3><p class="muted" style="font-size:.9rem">网关验票（Mode A 本地验，0 次回调 IoT Core）。无票 / 票坏 → 拒连。</p></div>
+      <div class="card"><h3>设备 → 网关</h3><p class="muted" style="font-size:.9rem">网关验票（Mode A 本地验，0 次回调 IoT Core）：校验签名 + <code>exp</code> 未过期 + <code>scope</code>，并以票里已验证的 <code>sub</code> 绑定设备身份（自报 <code>deviceId</code> 不符 → 403）。无票 / 票坏 / 过期 → 拒连。</p></div>
       <div class="card"><h3>起会话</h3><p class="muted" style="font-size:.9rem"><code>StartWebRTCContact</code> 只有网关的 IAM 角色能调，且仅在验票通过后调——这堵上了原本开放的 <code>/webcall</code>。</p></div>
       <div class="card"><h3>媒体不裸奔</h3><p class="muted" style="font-size:.9rem">Connect 返回的 Meeting/Attendee 是一次性会话票，网关只定向推给配对的观测网页，攻击者拿不到就建不了媒体流。</p></div>
     </div>

@@ -74,7 +74,9 @@ npx cdk deploy -c enableGateway=true -c enableAiAgent=true \
 - **IoT 设备** = 一台 **EC2**（t3.micro，AL2023）上的常驻 Node 进程（`device/device.js`），先 `POST /issue-ticket` 拿短期票（模拟 IoT Core 发票，Mode A），再用 WebSocket 长连接接入网关。经 **SSM Session Manager** 管理（无 SSH / 22 端口）。
 - **两张 DynamoDB 表**（设备密钥 + WS 连接注册）、预置的 IoT **Thing**（`speaker-001`）。
 
-**鉴权模型（无任何一跳裸奔）**：设备→网关用短期票（网关本地验，0 次回调 IoT Core）；`StartWebRTCContact` 只有网关 IAM 角色能调、且仅在验票通过后调（堵上原本开放的 `/webcall`）；网页→Connect 的媒体流靠 Connect 校验一次性 `ParticipantToken`（网关验票后才签发）。票据里的 HMAC 与 AgentCore 的 OIDC JWT 无关，只守 device↔gateway 的 WebSocket。移植自姊妹 demo `../cdk`（vgauth）的验票纯函数。
+**鉴权模型（无任何一跳裸奔）**：设备→网关用短期票（网关本地验，0 次回调 IoT Core）。票据 payload 带 `sub=deviceId`、`scope`、`exp`，`$connect` 校验签名后**还会校验 `exp` 未过期、`scope=voice-stream`**，并以**票里已验证的 `sub` 作为该连接的权威设备身份**——绝不信任 query string 里自报的 `deviceId`（若传了且与票不符 → 403）。这样"是否是正确的设备拿着信令来"由票据密码学保证，持 A 的票无法冒充 B。`StartWebRTCContact` 只有网关 IAM 角色能调、且仅在验票通过后调（堵上原本开放的 `/webcall`）；网页→Connect 的媒体流靠 Connect 校验一次性 `ParticipantToken`（网关验票后才签发）。票据里的 HMAC 与 AgentCore 的 OIDC JWT 无关，只守 device↔gateway 的 WebSocket。移植自姊妹 demo `../cdk`（vgauth）的验票纯函数。
+
+> 注：observer（观测网页）不带票、按 `deviceId` 配对——设计上把它当"可信本地外设"（设备的麦克风/屏幕），非受鉴权方。生产环境若要端到端收紧，需给 observer 也加配对鉴权。签名密钥当前是 demo 固定 HMAC（`do-not-use-in-prod`），生产应换非对称密钥或 IoT Core Credentials Provider 的 STS 凭证。
 
 **验证**：打开 `ObserverPageUrl`（`/gateway.html`）点「连接网关（观测）」→ EC2 设备上线后「加入音频」亮起 → 点击用麦克风与 AI 对话。设备与网页是两个独立进程，只靠配对码 `speaker-001` 在网关处会合。
 

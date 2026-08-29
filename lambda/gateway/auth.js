@@ -27,12 +27,13 @@ const TOKEN_SECRET = process.env.TOKEN_SECRET || 'connect-voice-demo-token-signi
 // Mode A: mint a token the gateway can verify with the verify key alone.
 // Format: base64url(payload).hmacSig  (two parts — NOT a standard JWT).
 function signToken(deviceId) {
+  const iat = Math.floor(Date.now() / 1000);
   const payload = {
     sub: deviceId,
     scope: 'voice-stream',
     iss: 'iot-core-demo',
-    iat: 1700000000,
-    exp: 1700003600,
+    iat,
+    exp: iat + 3600,
   };
   const body = Buffer.from(JSON.stringify(payload)).toString('base64url');
   const sig = crypto.createHmac('sha256', TOKEN_SECRET).update(body).digest('base64url');
@@ -56,6 +57,15 @@ function verifyToken(token) {
     claims = JSON.parse(Buffer.from(body, 'base64url').toString());
   } catch (_) {
     return { ok: false, steps: [...steps, 'payload not decodable'], iotCalls: 0 };
+  }
+  // Signature is valid — now enforce the claims. A well-signed but expired or
+  // wrong-scope ticket must NOT grant access.
+  const now = Math.floor(Date.now() / 1000);
+  if (!claims.exp || now >= claims.exp) {
+    return { ok: false, steps: [...steps, `ticket expired (exp=${claims.exp || 'none'})`], iotCalls: 0 };
+  }
+  if (claims.scope !== 'voice-stream') {
+    return { ok: false, steps: [...steps, `wrong scope: ${claims.scope || 'none'} (need voice-stream)`], iotCalls: 0 };
   }
   steps.push(`token valid: sub=${claims.sub}, scope=${claims.scope}`);
   steps.push('gateway made 0 calls to IoT Core (offline verification)');
