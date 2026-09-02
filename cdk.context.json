@@ -4,5 +4,6 @@
     "us-west-2b",
     "us-west-2c",
     "us-west-2d"
-  ]
+  ],
+  "ssm:account=613477150601:parameterName=/aws/service/ami-amazon-linux-latest/al2023-ami-kernel-6.1-x86_64:region=us-west-2": "ami-08a26983500a08011"
 }
